@@ -28,6 +28,42 @@ jobs:
         with:
           node-version: 22
 
+      - name: Verify GitHub Pages is enabled for Actions
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let pagesSite;
+
+            try {
+              pagesSite = await github.request("GET /repos/{owner}/{repo}/pages", {
+                owner,
+                repo,
+              });
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+
+              core.setFailed(
+                [
+                  "GitHub Pages is not enabled for this repository yet.",
+                  "Open Settings > Pages, set Build and deployment > Source to GitHub Actions, then rerun this workflow.",
+                  "Without that one-time setup, actions/configure-pages@v5 trips over a 404 and sulks in the logs.",
+                ].join(" "),
+              );
+              return;
+            }
+
+            if (pagesSite.data.build_type !== "workflow") {
+              core.setFailed(
+                [
+                  `GitHub Pages is enabled, but it is configured with build_type=${pagesSite.data.build_type}.`,
+                  "Open Settings > Pages and change Build and deployment > Source to GitHub Actions, then rerun this workflow.",
+                ].join(" "),
+              );
+            }
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 

@@ -9,6 +9,22 @@ async function createTempProject(): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), "npm-skills-test-"));
 }
 
+async function createRealpathFriendlyTempProject(): Promise<string> {
+  const cwd = await createTempProject();
+
+  if ((await fs.realpath(cwd)) !== cwd) {
+    return cwd;
+  }
+
+  const actualProjectDir = await createTempProject();
+  const aliasParentDir = await createTempProject();
+  const aliasDir = path.join(aliasParentDir, "linked-project");
+  const symlinkType = process.platform === "win32" ? "junction" : "dir";
+
+  await fs.symlink(actualProjectDir, aliasDir, symlinkType);
+  return aliasDir;
+}
+
 async function writeJson(filePath: string, value: unknown): Promise<void> {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   await fs.writeFile(filePath, JSON.stringify(value, null, 2));
@@ -884,7 +900,9 @@ describe("extractSkills", () => {
   });
 
   it("supports exported packages when only the realpath node_modules candidate exists", async () => {
-    const cwd = await createTempProject();
+    // Linux temp dirs usually resolve to themselves, so create a symlinked cwd
+    // to guarantee distinct logical and real node_modules candidates.
+    const cwd = await createRealpathFriendlyTempProject();
     const originalAccess = fs.access;
 
     await writeJson(path.join(cwd, "package.json"), {
