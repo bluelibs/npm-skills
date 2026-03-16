@@ -8,22 +8,51 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+        node:
+          - 22
+          - 24
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: ${{ matrix.node }}
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run QA
         run: npm run qa
+
+      - name: Build Pages artifact
+        run: npm run pages:build -- --output=.pages-build-check
+
+      - name: Remove Pages artifact check output
+        run: >-
+          node -e "const fs = require('node:fs');
+          fs.rmSync('.pages-build-check', { recursive: true, force: true });"
+
+      - name: Verify clean worktree after checks
+        run: >-
+          node -e "const { execFileSync } = require('node:child_process');
+          const output = execFileSync('git', ['status', '--short'], {
+          encoding: 'utf8' }).trim(); if (output) { console.error('QA left the
+          working tree dirty:\\n' + output); process.exit(1); }"

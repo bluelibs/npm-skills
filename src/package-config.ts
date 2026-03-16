@@ -4,12 +4,107 @@ import {
   DependencySection,
   InstalledPackageJson,
   NpmSkillsConfig,
-  PackageExportConfig,
+  NpmSkillsPublishConfig,
   ProjectPackageJson,
+  ResolvedNpmSkillsConsumeConfig,
   ResolvedNpmSkillsConfig,
+  ResolvedNpmSkillsPublishConfig,
 } from "./types";
 
 export const DEFAULT_SKILLS_DIR = "skills";
+export const DEFAULT_OUTPUT_DIR = ".agents/skills";
+
+function isNpmSkillsConfig(value: unknown): value is NpmSkillsConfig {
+  return Boolean(value) && typeof value === "object";
+}
+
+function resolveStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+function resolveStringMap(
+  value: Record<string, unknown> | undefined,
+): Record<string, string> {
+  if (!value) return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}
+
+function resolveConsumeConfig(
+  config: NpmSkillsConfig | undefined,
+): ResolvedNpmSkillsConsumeConfig {
+  const nestedConsume = isNpmSkillsConfig(config?.consume)
+    ? config.consume
+    : {};
+
+  return {
+    only: resolveStringArray(nestedConsume.only) ?? [],
+    map: {
+      ...resolveStringMap(nestedConsume.map),
+    },
+  };
+}
+
+function resolveConsumeOnly(
+  config: NpmSkillsConfig | undefined,
+): string[] | undefined {
+  const nestedConsume = isNpmSkillsConfig(config?.consume)
+    ? config.consume
+    : {};
+
+  return resolveStringArray(nestedConsume.only) ?? undefined;
+}
+
+function resolvePublishExports(
+  config: NpmSkillsPublishConfig | undefined,
+): false | string[] | undefined {
+  if (config?.export === false) return false;
+
+  return resolveStringArray(config?.export) ?? undefined;
+}
+
+function resolvePublishSource(
+  config: NpmSkillsPublishConfig | undefined,
+): string | undefined {
+  if (typeof config?.source === "string") return config.source;
+  return undefined;
+}
+
+function resolvePublishConfig(
+  packageJson: ProjectPackageJson | InstalledPackageJson,
+): ResolvedNpmSkillsPublishConfig {
+  const value = packageJson.npmSkills;
+  const config = isNpmSkillsConfig(value) ? value : undefined;
+  const publish =
+    config?.publish === false
+      ? false
+      : isNpmSkillsConfig(config?.publish)
+        ? config.publish
+        : undefined;
+  const publishConfig = publish === false ? undefined : publish;
+  const exportedNames = resolvePublishExports(publishConfig);
+  const disabled =
+    value === false || publish === false || exportedNames === false;
+
+  if (disabled) {
+    return {
+      source: resolvePublishSource(publishConfig) ?? DEFAULT_SKILLS_DIR,
+      exports: [],
+      disabled: true,
+    };
+  }
+
+  return {
+    source: resolvePublishSource(publishConfig) ?? DEFAULT_SKILLS_DIR,
+    exports: exportedNames ?? [],
+    disabled: false,
+  };
+}
 
 export async function readProjectPackageJson(
   cwd: string,
@@ -29,15 +124,17 @@ export async function readInstalledPackageJson(
 export function resolveNpmSkillsConfig(
   packageJson: ProjectPackageJson,
 ): ResolvedNpmSkillsConfig {
-  const legacy = packageJson["npm-skills"] ?? {};
-  const modern = packageJson.npmSkills ?? {};
+  const value = packageJson.npmSkills;
+  const config = isNpmSkillsConfig(value) ? value : undefined;
+  const consume = resolveConsumeConfig(config);
+  const only = resolveConsumeOnly(config);
 
   return {
-    only: modern.only ?? legacy.only ?? [],
-    custom: {
-      ...(legacy.custom ?? {}),
-      ...(modern.custom ?? {}),
+    consume: {
+      only: only ?? [],
+      map: consume.map,
     },
+    publish: resolvePublishConfig(packageJson),
   };
 }
 
@@ -71,24 +168,26 @@ export function getDependencyPackageNames(
 
 export function getPackageSkillSourceDir(
   packageName: string,
-  config: NpmSkillsConfig,
+  config:
+    | NpmSkillsConfig
+    | ResolvedNpmSkillsConfig
+    | ResolvedNpmSkillsConsumeConfig,
 ): string {
-  return config.custom?.[packageName] ?? DEFAULT_SKILLS_DIR;
-}
+  if ("consume" in config) {
+    return config.consume?.map?.[packageName] ?? DEFAULT_SKILLS_DIR;
+  }
 
-function isPackageExportConfig(value: unknown): value is PackageExportConfig {
-  return Boolean(value) && typeof value === "object";
+  if ("only" in config) {
+    return config.map?.[packageName] ?? DEFAULT_SKILLS_DIR;
+  }
+
+  const consume = resolveConsumeConfig(config);
+  return consume.map[packageName] ?? DEFAULT_SKILLS_DIR;
 }
 
 export function resolvePackageExportConfig(
   packageJson: InstalledPackageJson,
-): false | string[] {
-  const config = packageJson.npmSkills ?? packageJson["npm-skills"];
-
-  if (config === false) return false;
-  if (!isPackageExportConfig(config)) return [];
-
-  return Array.isArray(config.export)
-    ? config.export.filter((entry) => typeof entry === "string")
-    : [];
+): false | ResolvedNpmSkillsPublishConfig {
+  const publish = resolvePublishConfig(packageJson);
+  return publish.disabled ? false : publish;
 }

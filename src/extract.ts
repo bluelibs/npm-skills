@@ -2,15 +2,19 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createRequire } from "node:module";
 import {
+  DEFAULT_OUTPUT_DIR,
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
-  getPackageSkillSourceDir,
   readInstalledPackageJson,
   readProjectPackageJson,
   resolvePackageExportConfig,
   resolveNpmSkillsConfig,
 } from "./package-config";
-import { matchesAnyPattern, sanitizeName } from "./patterns";
+import {
+  matchesAnyPattern,
+  sanitizeName,
+  sanitizePathSegments,
+} from "./patterns";
 import {
   ExtractOptions,
   ExtractReport,
@@ -23,12 +27,90 @@ const DEFAULT_LOGGER: Logger = {
   warn: (message) => console.warn(message),
 };
 
+const EXTRACT_MANIFEST_FILE = ".npm-skills-manifest.json";
+
+interface ExtractManifest {
+  packages: Record<string, string[]>;
+}
+
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
     await fs.access(targetPath);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
+async function resolveInstalledPackageJsonPath(
+  resolvePath: (specifier: string) => string,
+  cwd: string,
+  packageName: string,
+): Promise<string | undefined> {
+  const packageNameSegments = packageName.split("/");
+
+  try {
+    const packageJsonPath = resolvePath(`${packageName}/package.json`);
+    return (await pathExists(packageJsonPath)) ? packageJsonPath : undefined;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (
+      code === "MODULE_NOT_FOUND" ||
+      code === "ERR_MODULE_NOT_FOUND" ||
+      code === "ERR_PACKAGE_PATH_NOT_EXPORTED"
+    ) {
+      if (code === "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+        try {
+          const packageEntryPath = resolvePath(packageName);
+          const startDir = (await fs.stat(packageEntryPath)).isDirectory()
+            ? packageEntryPath
+            : path.dirname(packageEntryPath);
+
+          let currentDir = await fs.realpath(startDir);
+          while (true) {
+            const packageJsonPath = path.join(currentDir, "package.json");
+            if (await pathExists(packageJsonPath)) return packageJsonPath;
+
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) break;
+            currentDir = parentDir;
+          }
+        } catch (fallbackError) {
+          const fallbackCode = (fallbackError as NodeJS.ErrnoException).code;
+          if (
+            fallbackCode === "MODULE_NOT_FOUND" ||
+            fallbackCode === "ERR_MODULE_NOT_FOUND"
+          ) {
+            // Fall through to explicit node_modules candidates below.
+          } else {
+            throw fallbackError;
+          }
+        }
+
+        const fallbackCandidates = [
+          path.join(
+            cwd,
+            "node_modules",
+            ...packageNameSegments,
+            "package.json",
+          ),
+          path.join(
+            await fs.realpath(cwd),
+            "node_modules",
+            ...packageNameSegments,
+            "package.json",
+          ),
+        ];
+
+        for (const candidatePath of fallbackCandidates) {
+          if (await pathExists(candidatePath)) return candidatePath;
+        }
+      }
+      return undefined;
+    }
+    throw error;
   }
 }
 
@@ -68,7 +150,9 @@ function buildDestinationName(
   relativeSkillDir: string,
 ): string {
   const packageSegment = sanitizeName(packageName);
-  const skillSegment = sanitizeName(relativeSkillDir || DEFAULT_SKILLS_DIR);
+  const skillSegment = sanitizePathSegments(
+    relativeSkillDir || DEFAULT_SKILLS_DIR,
+  );
   return `${packageSegment}-${skillSegment}`;
 }
 
@@ -94,49 +178,131 @@ function getPackageFilters(
 function createPackageResolver(cwd: string): (packageName: string) => string {
   const packageJsonPath = path.join(cwd, "package.json");
   const requireFromProject = createRequire(packageJsonPath);
-  return (packageName: string) =>
-    requireFromProject.resolve(`${packageName}/package.json`);
+  return (specifier: string) => requireFromProject.resolve(specifier);
+}
+
+function shouldPruneStaleSkills(
+  options: ExtractOptions,
+  cwd: string,
+  outputDir: string,
+): boolean {
+  return (
+    outputDir === path.resolve(cwd, DEFAULT_OUTPUT_DIR) &&
+    options.packageNames === undefined &&
+    options.only === undefined &&
+    (options.includeDevDependencies ?? true)
+  );
+}
+
+function createEmptyManifest(): ExtractManifest {
+  return { packages: {} };
+}
+
+async function readExtractManifest(
+  outputDir: string,
+): Promise<ExtractManifest> {
+  try {
+    const content = await fs.readFile(
+      path.join(outputDir, EXTRACT_MANIFEST_FILE),
+      "utf8",
+    );
+    return JSON.parse(content) as ExtractManifest;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") return createEmptyManifest();
+    throw error;
+  }
+}
+
+async function writeExtractManifest(
+  outputDir: string,
+  manifest: ExtractManifest,
+): Promise<void> {
+  await fs.writeFile(
+    path.join(outputDir, EXTRACT_MANIFEST_FILE),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+}
+
+function rememberManagedDestination(
+  manifest: ExtractManifest,
+  packageName: string,
+  destinationName: string,
+): void {
+  manifest.packages[packageName] = Array.from(
+    new Set([...manifest.packages[packageName], destinationName]),
+  ).sort();
+}
+
+function flattenManagedDestinations(manifest: ExtractManifest): string[] {
+  return Object.values(manifest.packages).flat().sort();
 }
 
 export async function extractSkills(
   options: ExtractOptions = {},
 ): Promise<ExtractReport> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const outputDir = path.resolve(cwd, options.outputDir ?? DEFAULT_SKILLS_DIR);
+  const outputDir = path.resolve(cwd, options.outputDir ?? DEFAULT_OUTPUT_DIR);
   const includeDevDependencies = options.includeDevDependencies ?? true;
   const override = options.override ?? false;
   const logger = options.logger ?? DEFAULT_LOGGER;
+  const pruneStaleSkills = shouldPruneStaleSkills(options, cwd, outputDir);
 
   const projectPackageJson = await readProjectPackageJson(cwd);
   const projectConfig = resolveNpmSkillsConfig(projectPackageJson);
-  const packageFilters = getPackageFilters(options, projectConfig.only);
+  const packageFilters = getPackageFilters(options, projectConfig.consume.only);
   const scannedPackages = getDependencyPackageNames(
     projectPackageJson,
     includeDevDependencies,
   ).filter((packageName) => matchesAnyPattern(packageName, packageFilters));
 
-  const resolvePackageJsonPath = createPackageResolver(cwd);
+  const resolvePath = createPackageResolver(cwd);
   const report: ExtractReport = {
     outputDir,
     scannedPackages,
     extracted: [],
     skipped: [],
   };
+  const previousManifest = pruneStaleSkills
+    ? await readExtractManifest(outputDir)
+    : createEmptyManifest();
+  const nextManifest = createEmptyManifest();
+  const unresolvedPackages = new Set<string>();
 
   await fs.mkdir(outputDir, { recursive: true });
 
   for (const packageName of scannedPackages) {
-    const packageJsonPath = resolvePackageJsonPath(packageName);
+    const packageJsonPath = await resolveInstalledPackageJsonPath(
+      resolvePath,
+      cwd,
+      packageName,
+    );
+    if (!packageJsonPath) {
+      unresolvedPackages.add(packageName);
+      report.skipped.push({
+        packageName,
+        sourceDir: "",
+        destinationDir: outputDir,
+        reason: "missing-package",
+      });
+      logger.warn(
+        `Skipped ${packageName} because it could not be resolved from node_modules.`,
+      );
+      continue;
+    }
+
+    nextManifest.packages[packageName] = [];
+
     const installedPackageJson =
       await readInstalledPackageJson(packageJsonPath);
     const packageExports = resolvePackageExportConfig(installedPackageJson);
     const packageRoot = path.dirname(packageJsonPath);
-    const sourceRoot = path.join(
-      packageRoot,
-      getPackageSkillSourceDir(packageName, projectConfig),
-    );
 
     if (packageExports === false) {
+      const sourceRoot = path.join(
+        packageRoot,
+        projectConfig.consume.map[packageName] ?? DEFAULT_SKILLS_DIR,
+      );
       report.skipped.push({
         packageName,
         sourceDir: sourceRoot,
@@ -148,6 +314,11 @@ export async function extractSkills(
       );
       continue;
     }
+
+    const sourceRoot = path.join(
+      packageRoot,
+      projectConfig.consume.map[packageName] ?? packageExports.source,
+    );
 
     const skillDirectories = await findSkillDirectories(sourceRoot);
 
@@ -164,8 +335,10 @@ export async function extractSkills(
 
     for (const skillDirectory of skillDirectories) {
       if (
-        packageExports.length > 0 &&
-        !packageExports.includes(getSkillExportName(sourceRoot, skillDirectory))
+        packageExports.exports.length > 0 &&
+        !packageExports.exports.includes(
+          getSkillExportName(sourceRoot, skillDirectory),
+        )
       ) {
         continue;
       }
@@ -183,6 +356,13 @@ export async function extractSkills(
       );
 
       if (overwriteDecision === "skip") {
+        if (previousManifest.packages[packageName]?.includes(destinationName)) {
+          rememberManagedDestination(
+            nextManifest,
+            packageName,
+            destinationName,
+          );
+        }
         report.skipped.push({
           packageName,
           sourceDir: skillDirectory,
@@ -196,6 +376,13 @@ export async function extractSkills(
       }
 
       if (overwriteDecision === "non-interactive") {
+        if (previousManifest.packages[packageName]?.includes(destinationName)) {
+          rememberManagedDestination(
+            nextManifest,
+            packageName,
+            destinationName,
+          );
+        }
         report.skipped.push({
           packageName,
           sourceDir: skillDirectory,
@@ -213,6 +400,7 @@ export async function extractSkills(
         recursive: true,
         force: true,
       });
+      rememberManagedDestination(nextManifest, packageName, destinationName);
 
       report.extracted.push({
         packageName,
@@ -222,6 +410,32 @@ export async function extractSkills(
       });
       logger.info(`Extracted ${destinationName}`);
     }
+  }
+
+  if (pruneStaleSkills) {
+    for (const packageName of unresolvedPackages) {
+      const previousNames = previousManifest.packages[packageName];
+      if (!previousNames) continue;
+
+      nextManifest.packages[packageName] = [...previousNames];
+    }
+
+    const currentDestinations = new Set(
+      flattenManagedDestinations(nextManifest),
+    );
+    const staleDestinations = flattenManagedDestinations(
+      previousManifest,
+    ).filter((destinationName) => !currentDestinations.has(destinationName));
+
+    for (const destinationName of staleDestinations) {
+      await fs.rm(path.join(outputDir, destinationName), {
+        recursive: true,
+        force: true,
+      });
+      logger.info(`Removed stale ${destinationName}`);
+    }
+
+    await writeExtractManifest(outputDir, nextManifest);
   }
 
   return report;

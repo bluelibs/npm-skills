@@ -28,3 +28,21 @@ export function sanitizeName(value: string): string {
     .replace(/-{2,}/g, "-")
     .toLowerCase();
 }
+
+export function sanitizePathSegment(value: string): string {
+  const sanitized = value
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .toLowerCase();
+
+  return sanitized || "skill";
+}
+
+export function sanitizePathSegments(value: string): string {
+  return value
+    .split(/[\\/]+/)
+    .filter((segment) => segment.length > 0)
+    .map((segment) => sanitizePathSegment(segment))
+    .join("--");
+}

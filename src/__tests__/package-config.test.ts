@@ -1,4 +1,5 @@
 import {
+  DEFAULT_OUTPUT_DIR,
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
   getDependencySections,
@@ -8,27 +9,69 @@ import {
 } from "../package-config";
 
 describe("package-config", () => {
-  it("merges modern and legacy npm skills config", () => {
+  it("exposes separate defaults for package sources and extraction output", () => {
+    expect(DEFAULT_SKILLS_DIR).toBe("skills");
+    expect(DEFAULT_OUTPUT_DIR).toBe(".agents/skills");
+  });
+
+  it("resolves consume and publish config from npmSkills", () => {
     const config = resolveNpmSkillsConfig({
-      "npm-skills": {
-        only: ["legacy-only"],
-        custom: {
-          legacy: ".legacy/skills",
-        },
-      },
       npmSkills: {
-        only: ["modern-only"],
-        custom: {
-          modern: ".modern/skills",
+        consume: {
+          only: ["consume-only"],
+          map: {
+            mappedConsume: ".consume/mapped-skills",
+          },
+        },
+        publish: {
+          source: ".agents/skills",
+          export: ["public", "react"],
         },
       },
     });
 
     expect(config).toEqual({
-      only: ["modern-only"],
-      custom: {
-        legacy: ".legacy/skills",
-        modern: ".modern/skills",
+      consume: {
+        only: ["consume-only"],
+        map: {
+          mappedConsume: ".consume/mapped-skills",
+        },
+      },
+      publish: {
+        source: ".agents/skills",
+        exports: ["public", "react"],
+        disabled: false,
+      },
+    });
+  });
+
+  it("ignores unknown package.json keys outside npmSkills", () => {
+    const packageJson = {
+      npmSkills: {
+        consume: {
+          only: ["modern-only"],
+        },
+        publish: {
+          source: ".modern/publish",
+          export: ["modern"],
+        },
+      },
+      randomKey: {
+        consume: {
+          only: ["ghosts-of-configs-past"],
+        },
+      },
+    };
+
+    expect(resolveNpmSkillsConfig(packageJson)).toEqual({
+      consume: {
+        only: ["modern-only"],
+        map: {},
+      },
+      publish: {
+        source: ".modern/publish",
+        exports: ["modern"],
+        disabled: false,
       },
     });
   });
@@ -59,14 +102,35 @@ describe("package-config", () => {
     ).toEqual(["a", "b", "c", "d"]);
   });
 
-  it("resolves custom skill directories", () => {
+  it("resolves mapped skill directories", () => {
     expect(
       getPackageSkillSourceDir("@bluelibs/runner", {
-        custom: {
-          "@bluelibs/runner": ".agents/skills",
+        only: [],
+        map: {
+          "@bluelibs/runner": ".mapped/skills",
         },
       }),
-    ).toBe(".agents/skills");
+    ).toBe(".mapped/skills");
+    expect(
+      getPackageSkillSourceDir("@bluelibs/runner", {
+        consume: {
+          map: {
+            "@bluelibs/runner": ".consume/skills",
+          },
+        },
+      }),
+    ).toBe(".consume/skills");
+    expect(
+      getPackageSkillSourceDir("@bluelibs/runner", {
+        consume: {},
+      }),
+    ).toBe(DEFAULT_SKILLS_DIR);
+    expect(
+      getPackageSkillSourceDir("@bluelibs/runner", {
+        only: [],
+        map: {},
+      }),
+    ).toBe(DEFAULT_SKILLS_DIR);
     expect(getPackageSkillSourceDir("left-pad", {})).toBe(DEFAULT_SKILLS_DIR);
   });
 
@@ -75,27 +139,55 @@ describe("package-config", () => {
     expect(
       resolvePackageExportConfig({
         npmSkills: {
-          export: ["runner", "architecture"],
+          publish: {
+            source: "my-skillz",
+            export: ["runner", "architecture"],
+          },
         },
       }),
-    ).toEqual(["runner", "architecture"]);
-    expect(
-      resolvePackageExportConfig({
-        "npm-skills": {
-          export: ["legacy"],
-        },
-      }),
-    ).toEqual(["legacy"]);
-    expect(resolvePackageExportConfig({ npmSkills: true as never })).toEqual(
-      [],
-    );
-    expect(resolvePackageExportConfig({ npmSkills: {} })).toEqual([]);
+    ).toEqual({
+      source: "my-skillz",
+      exports: ["runner", "architecture"],
+      disabled: false,
+    });
+    expect(resolvePackageExportConfig({ npmSkills: true as never })).toEqual({
+      source: DEFAULT_SKILLS_DIR,
+      exports: [],
+      disabled: false,
+    });
+    expect(resolvePackageExportConfig({ npmSkills: {} })).toEqual({
+      source: DEFAULT_SKILLS_DIR,
+      exports: [],
+      disabled: false,
+    });
     expect(
       resolvePackageExportConfig({
         npmSkills: {
-          export: ["ok", 1 as never],
+          publish: {
+            export: ["ok", 1 as never],
+          },
         },
       }),
-    ).toEqual(["ok"]);
+    ).toEqual({
+      source: DEFAULT_SKILLS_DIR,
+      exports: ["ok"],
+      disabled: false,
+    });
+    expect(
+      resolvePackageExportConfig({
+        npmSkills: {
+          publish: false,
+        },
+      }),
+    ).toBe(false);
+    expect(
+      resolvePackageExportConfig({
+        npmSkills: {
+          publish: {
+            export: false,
+          },
+        },
+      }),
+    ).toBe(false);
   });
 });

@@ -25,14 +25,17 @@
   },
   "files": [
     "dist",
-    "README.md",
-    "AGENTS.md"
+    "LICENSE.md",
+    "README.md"
   ],
   "scripts": {
     "build": "tsup --config config/tsup/tsup.config.ts --sourcemap && npm run build:types",
     "build:types": "tsc -p config/ts/tsconfig.types.json",
-    "clean": "rm -rf dist coverage",
-    "test": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --maxWorkers=50% --verbose=false",
+    "clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.rmSync('coverage',{recursive:true,force:true});\"",
+    "pages:build": "node ./scripts/build-pages-site.mjs",
+    "pages:dev": "node ./scripts/pages-dev.mjs",
+    "pages:sync": "node ./scripts/sync-pages-readme.mjs",
+    "test": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --verbose=false",
     "test:serial": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --verbose --runInBand",
     "test:dev": "jest --config config/jest/jest.config.js --verbose --watch",
     "coverage": "jest --config config/jest/jest.config.js --verbose --coverage",
@@ -42,7 +45,7 @@
     "lint": "eslint --config config/eslint/eslint.config.mjs ./src",
     "lint:fix": "eslint --config config/eslint/eslint.config.mjs ./src --fix",
     "qa": "npm run coverage:ai && npm run lint:fix && npm run typecheck && npm run build",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run qa"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

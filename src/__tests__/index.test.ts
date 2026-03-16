@@ -1,14 +1,18 @@
 import * as cli from "../cli";
 import * as extract from "../extract";
 import * as index from "../index";
+import * as newSkill from "../new-skill";
 import * as packageConfig from "../package-config";
 import * as patterns from "../patterns";
 
 describe("index exports", () => {
   it("re-exports the public api", () => {
     expect(index.extractSkills).toBe(extract.extractSkills);
+    expect(index.createSkillTemplate).toBe(newSkill.createSkillTemplate);
+    expect(index.getHelpText).toBe(cli.getHelpText);
     expect(index.parseCliArgs).toBe(cli.parseCliArgs);
     expect(index.runCli).toBe(cli.runCli);
+    expect(index.DEFAULT_OUTPUT_DIR).toBe(packageConfig.DEFAULT_OUTPUT_DIR);
     expect(index.DEFAULT_SKILLS_DIR).toBe(packageConfig.DEFAULT_SKILLS_DIR);
     expect(index.getDependencyPackageNames).toBe(
       packageConfig.getDependencyPackageNames,
@@ -34,6 +38,8 @@ describe("index exports", () => {
     expect(index.matchesAnyPattern).toBe(patterns.matchesAnyPattern);
     expect(index.matchesPattern).toBe(patterns.matchesPattern);
     expect(index.sanitizeName).toBe(patterns.sanitizeName);
+    expect(index.sanitizePathSegment).toBe(patterns.sanitizePathSegment);
+    expect(index.sanitizePathSegments).toBe(patterns.sanitizePathSegments);
     expect(index.splitCommaSeparatedValues).toBe(
       patterns.splitCommaSeparatedValues,
     );

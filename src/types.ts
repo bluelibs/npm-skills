@@ -4,21 +4,40 @@ export type DependencySection =
   | "optionalDependencies"
   | "peerDependencies";
 
-export interface NpmSkillsConfig {
+export interface NpmSkillsConsumeConfig {
   only?: string[];
-  custom?: Record<string, string>;
+  map?: Record<string, string>;
+}
+
+export interface NpmSkillsPublishConfig {
+  source?: string;
+  export?: false | string[];
+}
+
+export interface NpmSkillsConfig {
+  consume?: NpmSkillsConsumeConfig;
+  publish?: false | NpmSkillsPublishConfig;
+}
+
+export interface ResolvedNpmSkillsConsumeConfig {
+  only: string[];
+  map: Record<string, string>;
+}
+
+export interface ResolvedNpmSkillsPublishConfig {
+  source: string;
+  exports: string[];
+  disabled: boolean;
 }
 
 export interface ResolvedNpmSkillsConfig {
-  only: string[];
-  custom: Record<string, string>;
+  consume: ResolvedNpmSkillsConsumeConfig;
+  publish: ResolvedNpmSkillsPublishConfig;
 }
 
-export interface PackageExportConfig {
-  export?: string[];
-}
+export interface PackageExportConfig extends NpmSkillsPublishConfig {}
 
-export type PackageNpmSkillsConfig = false | PackageExportConfig;
+export type PackageNpmSkillsConfig = false | NpmSkillsConfig;
 
 export interface ProjectPackageJson {
   name?: string;
@@ -26,15 +45,13 @@ export interface ProjectPackageJson {
   devDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
-  npmSkills?: NpmSkillsConfig;
-  "npm-skills"?: NpmSkillsConfig;
+  npmSkills?: false | NpmSkillsConfig;
 }
 
 export interface InstalledPackageJson {
   name?: string;
   version?: string;
   npmSkills?: PackageNpmSkillsConfig;
-  "npm-skills"?: PackageNpmSkillsConfig;
 }
 
 export interface ExtractOptions {
@@ -68,7 +85,12 @@ export interface SkippedSkill {
   packageName: string;
   sourceDir: string;
   destinationDir: string;
-  reason: "declined" | "non-interactive" | "missing-source" | "package-opt-out";
+  reason:
+    | "declined"
+    | "missing-package"
+    | "non-interactive"
+    | "missing-source"
+    | "package-opt-out";
 }
 
 export interface ExtractReport {
@@ -76,6 +98,18 @@ export interface ExtractReport {
   scannedPackages: string[];
   extracted: ExtractedSkill[];
   skipped: SkippedSkill[];
+}
+
+export interface CreateSkillTemplateOptions {
+  cwd?: string;
+  skillName: string;
+  folder?: string;
+}
+
+export interface CreateSkillTemplateReport {
+  skillName: string;
+  skillDir: string;
+  skillFile: string;
 }
 
 export interface CliDependencies {

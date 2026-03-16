@@ -1,6 +1,12 @@
-import { createInteractivePrompt, parseCliArgs, runCli } from "../cli";
+import {
+  createInteractivePrompt,
+  getHelpText,
+  parseCliArgs,
+  runCli,
+} from "../cli";
 import {
   CliDependencies,
+  CreateSkillTemplateReport,
   ExtractReport,
   Logger,
   OverwritePrompt,
@@ -9,10 +15,21 @@ import {
 jest.mock("../extract", () => ({
   extractSkills: jest.fn(),
 }));
+jest.mock("../new-skill", () => ({
+  createSkillTemplate: jest.fn(),
+}));
 
 const { extractSkills } = jest.requireMock("../extract") as {
   extractSkills: jest.Mock<Promise<ExtractReport>, [unknown]>;
 };
+const { createSkillTemplate } = jest.requireMock("../new-skill") as {
+  createSkillTemplate: jest.Mock<Promise<CreateSkillTemplateReport>, [unknown]>;
+};
+
+beforeEach(() => {
+  extractSkills.mockReset();
+  createSkillTemplate.mockReset();
+});
 
 function createDependencies(
   overrides: Partial<CliDependencies> = {},
@@ -72,6 +89,13 @@ describe("cli", () => {
       },
     });
 
+    expect(parseCliArgs(["extract", "--dev", "false"])).toEqual({
+      command: "extract",
+      options: {
+        includeDevDependencies: false,
+      },
+    });
+
     expect(
       parseCliArgs(["extract", "--output", "skills", "--only", "pkg-a,pkg-b"]),
     ).toEqual({
@@ -81,14 +105,53 @@ describe("cli", () => {
         only: ["pkg-a", "pkg-b"],
       },
     });
+
+    expect(parseCliArgs(["new", "my-skill"])).toEqual({
+      command: "new",
+      options: {
+        skillName: "my-skill",
+      },
+    });
+
+    expect(parseCliArgs(["new", "my-skill", "--folder=./"])).toEqual({
+      command: "new",
+      options: {
+        skillName: "my-skill",
+        folder: "./",
+      },
+    });
+
+    expect(parseCliArgs(["new", "my-skill", "--folder", "templates"])).toEqual({
+      command: "new",
+      options: {
+        skillName: "my-skill",
+        folder: "templates",
+      },
+    });
   });
 
   it("throws on invalid arguments and booleans", () => {
     expect(() => parseCliArgs([])).toThrow("Missing command");
     expect(() => parseCliArgs(["list"])).toThrow("Unsupported command");
     expect(() => parseCliArgs(["extract", "--wat"])).toThrow("Unknown option");
+    expect(() => parseCliArgs(["extract", "--output"])).toThrow(
+      "Missing value for --output",
+    );
+    expect(() => parseCliArgs(["extract", "--only", "--override"])).toThrow(
+      "Missing value for --only",
+    );
     expect(() => parseCliArgs(["extract", "--dev=maybe"])).toThrow(
       "Invalid boolean value: maybe",
+    );
+    expect(() => parseCliArgs(["new"])).toThrow("Missing skill name for new");
+    expect(() => parseCliArgs(["new", "one", "two"])).toThrow(
+      "Unexpected extra arguments: two",
+    );
+    expect(() => parseCliArgs(["new", "my-skill", "--folder"])).toThrow(
+      "Missing value for --folder",
+    );
+    expect(() => parseCliArgs(["new", "my-skill", "--wat"])).toThrow(
+      "Unknown option: --wat",
     );
   });
 
@@ -141,6 +204,36 @@ describe("cli", () => {
     expect(dependencies.stdout.log).toHaveBeenCalledWith("Skipped 1 skill(s).");
   });
 
+  it("creates a skill template and reports its location", async () => {
+    createSkillTemplate.mockResolvedValue({
+      skillName: "my-skill",
+      skillDir: "/tmp/.agents/skills/my-skill",
+      skillFile: "/tmp/.agents/skills/my-skill/SKILL.md",
+    });
+
+    const dependencies = createDependencies();
+    await expect(runCli(["new", "my-skill"], dependencies)).resolves.toBe(0);
+    expect(createSkillTemplate).toHaveBeenCalledWith({
+      skillName: "my-skill",
+    });
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(
+      "Created skill template at /tmp/.agents/skills/my-skill.",
+    );
+    expect(extractSkills).not.toHaveBeenCalled();
+  });
+
+  it("shows help for bare cli and help flags", async () => {
+    const dependencies = createDependencies();
+
+    await expect(runCli([], dependencies)).resolves.toBe(0);
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(getHelpText());
+    expect(extractSkills).not.toHaveBeenCalled();
+
+    const helpDependencies = createDependencies();
+    await expect(runCli(["--help"], helpDependencies)).resolves.toBe(0);
+    expect(helpDependencies.stdout.log).toHaveBeenCalledWith(getHelpText());
+  });
+
   it("avoids passing prompts when override is enabled and returns errors", async () => {
     extractSkills.mockResolvedValueOnce({
       outputDir: "/tmp/skills",
@@ -173,6 +266,15 @@ describe("cli", () => {
     await expect(runCli(["extract"], thirdDependencies)).resolves.toBe(1);
     expect(thirdDependencies.stdout.error).toHaveBeenCalledWith(
       "string-failure",
+    );
+
+    createSkillTemplate.mockRejectedValueOnce(new Error("already there"));
+    const fourthDependencies = createDependencies();
+    await expect(runCli(["new", "my-skill"], fourthDependencies)).resolves.toBe(
+      1,
+    );
+    expect(fourthDependencies.stdout.error).toHaveBeenCalledWith(
+      "already there",
     );
   });
 

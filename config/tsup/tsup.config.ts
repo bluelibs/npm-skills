@@ -19,16 +19,25 @@ const outExtension = (ctx: { format: BuildFormat }) => ({
   js: ctx.format === "cjs" ? ".cjs" : ".mjs",
 });
 
-export default defineConfig({
-  ...COMMON,
-  entry: {
-    index: "src/index.ts",
-    cli: "src/cli.ts",
-    bin: "bin.ts",
+export default defineConfig([
+  {
+    ...COMMON,
+    entry: {
+      index: "src/index.ts",
+    },
+    outDir: "dist",
+    outExtension,
   },
-  outDir: "dist",
-  banner: {
-    js: "#!/usr/bin/env node",
+  {
+    ...COMMON,
+    entry: {
+      bin: "bin.ts",
+    },
+    outDir: "dist",
+    clean: false,
+    banner: {
+      js: "#!/usr/bin/env node",
+    },
+    outExtension,
   },
-  outExtension,
-});
+]);

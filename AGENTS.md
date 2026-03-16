@@ -4,6 +4,8 @@
 - Do not modify or revert someone else's changes without confirmation.
 - Design for clarity before cleverness.
 - Keep code human-friendly with descriptive names and comments that explain why.
+- Keep the repository license as `LICENSE.md`.
+- Generated skills should include a `LICENSE.txt`.
 - Keep functions small and decouple early so the code reads like a story.
 - Keep non-documentation files small when practical, ideally under 300 lines.
 - Think about contracts and acceptance criteria before implementation.
@@ -27,7 +29,6 @@
 - The package extracts skills from installed npm packages by copying skill directories recursively.
 - Skill discovery should stay predictable: scan under a configured source root, treat any directory containing `SKILL.md` as a skill root, and copy that directory as-is.
 - Prefer friendly warnings and explicit overwrite behavior over silent destructive actions.
-- Support both `npmSkills` and legacy `npm-skills` config keys in `package.json`.
 
 ## Changes
 

@@ -2,6 +2,8 @@ import {
   matchesAnyPattern,
   matchesPattern,
   sanitizeName,
+  sanitizePathSegment,
+  sanitizePathSegments,
   splitCommaSeparatedValues,
   wildcardToRegExp,
 } from "../patterns";
@@ -24,5 +26,9 @@ describe("patterns", () => {
     expect(sanitizeName("@bluelibs/runner")).toBe("bluelibs-runner");
     expect(sanitizeName("nested/path")).toBe("nested-path");
     expect(sanitizeName("Already--Clean")).toBe("already-clean");
+    expect(sanitizePathSegment("Runner_Core")).toBe("runner_core");
+    expect(sanitizePathSegment("!!!")).toBe("skill");
+    expect(sanitizePathSegments("runner/core")).toBe("runner--core");
+    expect(sanitizePathSegments("runner-core")).toBe("runner-core");
   });
 });
