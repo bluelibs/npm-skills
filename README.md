@@ -13,7 +13,7 @@
 
 `npm-skills` gives npm packages a simple, standard way to ship AI skills as part of the dependencies teams already install.
 
-If a package exposes a `skills/` folder containing one or more skill directories with a `SKILL.md`, this tool can extract them into your local `.agents/skills` folder with one command, staying workspace-local when you run it from `packages/*` and fitting neatly into AGENTS.md-style repos.
+If a package exposes a `skills/` folder containing one or more skill directories with a `SKILL.md`, this tool can extract them into your local `.agents/skills` folder with one command, keeping the output in the current project even when you run it from `packages/*` and fitting neatly into AGENTS.md-style repos.
 
 That means package authors get a predictable convention, and consumers get a clean DX instead of custom copy scripts, mystery folders, and ritual sacrifice to the filesystem gods.
 
@@ -28,18 +28,18 @@ That means package authors get a predictable convention, and consumers get a cle
 
 It follows conventions people already recognize from the [`skills.sh` ecosystem](https://skills.sh/docs), the [`SKILL.md`-based format used by the open `skills` tool](https://github.com/vercel-labs/skills#creating-skills), and [`AGENTS.md`](https://agents.md/)-style repos:
 
-- a skill is a directory rooted by `SKILL.md`
+- any directory containing `SKILL.md` is treated as a skill root
 - support files live beside that `SKILL.md`
 - packages usually publish from `skills/`
 - consuming projects usually extract into `.agents/skills/`
 
-`skills.sh` is a strong fit when you want a hosted catalog and public discovery. `npm-skills` is for the other lane: distributing skills as part of your dependency graph.
+`skills.sh` is a strong fit when you want a hosted catalog and public discovery. `npm-skills` is for distributing skills as part of your dependency graph.
 
 `npm-skills` officially targets Node `>=22`.
 
-- Node: first-class target for both the CLI and programmatic API
-- Bun: the published artifacts may work, but Bun is not part of the verified support matrix yet
-- Deno: the published artifacts may work with the usual file and system permissions, but Deno is not part of the verified support matrix yet
+- Node: officially supported for both the CLI and programmatic API
+- Bun: the published artifacts may work, but Bun is not officially tested yet
+- Deno: the published artifacts may work with the usual file and system permissions, but Deno is not officially tested yet
 
 The CLI is the primary way this package is meant to be used. In most projects you will not need the programmatic API at all, which is nice because we all deserve at least one tool in life that does not begin with "first, write a wrapper."
 
@@ -96,7 +96,7 @@ If you prefer to avoid automatic overwrites, keep extraction as an explicit scri
 
 Skill discovery stays predictable:
 
-- scan under a configured source root
+- scan under a configured source folder
 - treat any directory containing `SKILL.md` as a skill root
 - copy that directory recursively as-is
 
@@ -128,7 +128,7 @@ Overwrite behavior is intentionally conservative:
 - if the destination exists in an interactive terminal, it asks `y/N`
 - if the destination exists in non-interactive mode, it skips and warns
 - if a listed package is not currently resolvable from `node_modules`, it skips and warns instead of aborting the whole run
-- full default syncs into `.agents/skills` also prune stale folders that were previously extracted for this repo, without touching unrelated folders or custom output directories
+- full default syncs into `.agents/skills` also remove stale folders from earlier extractions for this repo, without touching unrelated folders or custom output directories
 
 By default, `npm-skills` scans:
 
@@ -177,22 +177,22 @@ Example:
 `consume.map`
 
 - Optional per-package source folder overrides
-- Default source root is `skills`
-- Values are resolved relative to the installed package root
+- Default source folder is `skills`
+- Values are resolved relative to the installed package folder
 
 `publish.source`
 
-- Optional source root for skills this package publishes
+- Optional source folder for skills this package publishes
 - Defaults to `skills`
 - Useful when your repo authors skills under `.agents/skills`
 
 `publish.export`
 
-- Optional list of top-level skill trees to expose
-- If omitted, every discovered skill under `publish.source` is exportable
+- Optional list of top-level skill folders to expose
+- If omitted, every discovered skill under `publish.source` can be published
 - If set to `false`, this package opts out of skill publishing
 
-If a package wants to export only some skill trees:
+If a package wants to export only some skill folders:
 
 ```json
 {
@@ -219,7 +219,7 @@ With this structure:
       SKILL.md
 ```
 
-`publish.export: ["runner"]` will export everything under the top-level `runner/` tree and skip `internal/`.
+`publish.export: ["runner"]` will export everything under the top-level `runner/` folder and skip `internal/`.
 
 If a package wants to disable skill export entirely:
 
@@ -234,7 +234,7 @@ If a package wants to disable skill export entirely:
 Consumer-side config and package-side config are separate:
 
 - consumer config decides where to read skills from for a given installed package
-- package config decides where this package publishes skills from, and which skill trees are exportable
+- package config decides where this package publishes skills from, and which skill folders can be published
 
 ## CLI
 
