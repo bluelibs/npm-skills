@@ -14,6 +14,11 @@ If a package exposes a `skills/` folder containing one or more skill directories
 
 That means package authors get a predictable convention, and consumers get a clean DX instead of custom copy scripts, mystery folders, and ritual sacrifice to the filesystem gods.
 
+<!--readme-variant-links:start-->
+> Prefer the polished version of this guide?
+> Browse the docs site at [bluelibs.github.io/npm-skills](https://bluelibs.github.io/npm-skills/).
+<!--readme-variant-links:end-->
+
 ## Overview
 
 `npm-skills` is for shipping skills inside ordinary npm packages, versioning them with `package.json`, moving them through private registries, and extracting them into the workspace where they are actually used.
