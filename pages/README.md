@@ -1,11 +1,14 @@
 <h1 align="center">npm-skills</h1>
-
 <p align="center">
   <img src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" alt="Node 22+" />
-  &nbsp;
-  <img src="https://img.shields.io/badge/bun-experimental-f9f1e1?logo=bun&logoColor=111111" alt="Bun experimental" />
-  &nbsp;
-  <img src="https://img.shields.io/badge/deno-experimental-000000?logo=deno&logoColor=white" alt="Deno experimental" />
+  <img src="https://img.shields.io/badge/coverage-100%25-16a34a" alt="100% test coverage" />
+  <img src="https://img.shields.io/badge/bun-exp-f9f1e1?logo=bun&logoColor=111111" alt="Bun experimental" />
+  <img src="https://img.shields.io/badge/deno-exp-000000?logo=deno&logoColor=white" alt="Deno experimental" />
+  <br />
+  <img src="https://img.shields.io/badge/linux-fcc624?logo=linux&logoColor=111111" alt="Linux" />
+  <img src="https://img.shields.io/badge/macos-111111?logo=apple&logoColor=white" alt="macOS" />
+  <img src="https://img.shields.io/badge/windows-0078d4?logo=windows&logoColor=white" alt="Windows" />
+  <img src="https://img.shields.io/badge/AGENTS.md-compatible-2563eb" alt="AGENTS.md compatible" />
 </p>
 
 `npm-skills` gives npm packages a simple, standard way to ship AI skills as part of the dependencies teams already install.

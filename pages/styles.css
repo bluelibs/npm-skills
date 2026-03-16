@@ -619,11 +619,13 @@ img {
 
 .markdown-body p[align="center"] {
   text-align: center;
+  line-height: 1.08;
+  margin: 0.2rem 0 0.7rem;
 }
 
 .markdown-body p[align="center"] img {
   display: inline-block;
-  margin: 0 0.35rem;
+  margin: 0 0.12rem 0.18rem;
   vertical-align: middle;
   border-radius: 999px;
   box-shadow: none;
