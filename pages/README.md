@@ -388,8 +388,6 @@ Run it locally with:
 npm run qa
 ```
 
-Simple beats clever here. Your future users will thank you, and your future self will complain less.
-
 ## License
 
 MIT
