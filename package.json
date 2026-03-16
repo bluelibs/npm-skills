@@ -1,0 +1,82 @@
+{
+  "name": "npm-skills",
+  "version": "0.0.0",
+  "description": "Extract skills from installed npm packages into a local skills folder.",
+  "license": "MIT",
+  "sideEffects": false,
+  "type": "commonjs",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/types/index.d.ts",
+  "bin": {
+    "npm-skills": "dist/bin.cjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "build": "tsup --config config/tsup/tsup.config.ts --sourcemap && npm run build:types",
+    "build:types": "tsc -p config/ts/tsconfig.types.json",
+    "clean": "rm -rf dist coverage",
+    "test": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --maxWorkers=50% --verbose=false",
+    "test:serial": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --verbose --runInBand",
+    "test:dev": "jest --config config/jest/jest.config.js --verbose --watch",
+    "coverage": "jest --config config/jest/jest.config.js --verbose --coverage",
+    "coverage:ai": "node ./scripts/run-coverage-ai.mjs",
+    "test:clean": "jest --config config/jest/jest.config.js --clearCache",
+    "typecheck": "tsc -p config/ts/tsconfig.json --noEmit",
+    "lint": "eslint --config config/eslint/eslint.config.mjs ./src",
+    "lint:fix": "eslint --config config/eslint/eslint.config.mjs ./src --fix",
+    "qa": "npm run coverage:ai && npm run lint:fix && npm run typecheck && npm run build",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.3",
+    "@typescript-eslint/eslint-plugin": "8.56.0",
+    "@typescript-eslint/parser": "8.56.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jest": "^29.15.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "globals": "^16.5.0",
+    "jest": "^30.2.0",
+    "prettier": "^3.7.4",
+    "ts-jest": "^29.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.0"
+  },
+  "prettier": {
+    "trailingComma": "all",
+    "tabWidth": 2,
+    "singleQuote": false,
+    "endOfLine": "auto",
+    "overrides": [
+      {
+        "files": [
+          "*.ts"
+        ],
+        "options": {
+          "parser": "babel-ts"
+        }
+      }
+    ]
+  }
+}

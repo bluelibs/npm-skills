@@ -1,0 +1,31 @@
+# Source and tests
+src/
+bin.ts
+
+# Tooling and local project config
+config/
+scripts/
+.github/
+
+# Local outputs and dependencies
+node_modules/
+coverage/
+skills/
+.agents/
+
+# Repo meta
+.git/
+.gitignore
+AGENTS.md
+
+# Editors and OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.*
+
+# TypeScript build cache
+*.tsbuildinfo
