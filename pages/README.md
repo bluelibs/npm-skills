@@ -13,12 +13,12 @@
 
 `npm-skills` gives npm packages a simple, standard way to ship AI skills as part of the dependencies teams already install.
 
+> Want the source code, issues, and release trail?
+> Head to the [GitHub repository](https://github.com/bluelibs/npm-skills).
+
 If a package exposes a `skills/` folder containing one or more skill directories with a `SKILL.md`, this tool can extract them into your local `.agents/skills` folder with one command, keeping the output in the current project even when you run it from `packages/*` and fitting neatly into AGENTS.md-style repos.
 
 That means package authors get a predictable convention, and consumers get a clean DX instead of custom copy scripts, mystery folders, and ritual sacrifice to the filesystem gods.
-
-> Want the source code, issues, and release trail?
-> Head to the [GitHub repository](https://github.com/bluelibs/npm-skills).
 
 ## Overview
 
