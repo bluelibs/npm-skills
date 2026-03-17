@@ -106,14 +106,13 @@ describe("extractSkills", () => {
       expect(report.skipped.map((entry) => entry.reason)).toEqual([
         "missing-source",
       ]);
+      expect(report.deletedSkills).toBe(0);
     } finally {
       process.chdir(previousCwd);
     }
 
     expect(logSpy).toHaveBeenCalledWith("Extracted default-package-basic");
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("No skills found for missing-skills-package"),
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it("keeps default output workspace-local inside packages directories", async () => {
@@ -196,9 +195,43 @@ describe("extractSkills", () => {
       "missing-package",
       "missing-package",
     ]);
+    expect(report.deletedSkills).toBe(0);
     expect(messages.warn).toEqual([
       "Skipped not-installed because it could not be resolved from node_modules.",
       "Skipped peer-not-installed because it could not be resolved from node_modules.",
+    ]);
+  });
+
+  it("shows missing skills diagnostics only in verbose mode", async () => {
+    const cwd = await createTempProject();
+    const { logger, messages } = createLogger();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "missing-skills-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/missing-skills-package/package.json"),
+      {
+        name: "missing-skills-package",
+        version: "1.0.0",
+      },
+    );
+
+    const report = await extractSkills({
+      cwd,
+      logger,
+      verbose: true,
+    });
+
+    expect(report.skipped.map((entry) => entry.reason)).toEqual([
+      "missing-source",
+    ]);
+    expect(report.deletedSkills).toBe(0);
+    expect(messages.warn).toEqual([
+      expect.stringContaining("No skills found for missing-skills-package at "),
     ]);
   });
 
@@ -582,9 +615,7 @@ describe("extractSkills", () => {
         "utf8",
       ),
     ).rejects.toThrow();
-    expect(messages.warn).toEqual([
-      expect.stringContaining("No skills found for missing-skills"),
-    ]);
+    expect(messages.warn).toEqual([]);
 
     const noDevReport = await extractSkills({
       cwd,
@@ -1067,6 +1098,7 @@ describe("extractSkills", () => {
     expect(report.skipped.map((entry) => entry.reason)).toEqual([
       "missing-source",
     ]);
+    expect(report.deletedSkills).toBe(1);
     await expect(
       fs.readFile(
         path.join(cwd, ".agents/skills/bluelibs-runner-release/SKILL.md"),
@@ -1145,7 +1177,7 @@ describe("extractSkills", () => {
     ).resolves.toBe("# Release\n");
   });
 
-  it("does not prune stale managed skills in custom output directories", async () => {
+  it("prunes stale managed skills in custom output directories", async () => {
     const cwd = await createTempProject();
     await writeJson(path.join(cwd, "package.json"), {
       name: "consumer",
@@ -1168,6 +1200,10 @@ describe("extractSkills", () => {
       outputDir: "shared-skills",
       override: true,
     });
+    await writeFile(
+      path.join(cwd, "shared-skills/local-playground/notes.txt"),
+      "keep me",
+    );
     await fs.rm(path.join(cwd, "node_modules/plain-package/skills/writing"), {
       recursive: true,
       force: true,
@@ -1184,7 +1220,19 @@ describe("extractSkills", () => {
         path.join(cwd, "shared-skills/plain-package-writing/SKILL.md"),
         "utf8",
       ),
-    ).resolves.toBe("# Writing\n");
+    ).rejects.toThrow();
+    await expect(
+      fs.readFile(
+        path.join(cwd, "shared-skills/local-playground/notes.txt"),
+        "utf8",
+      ),
+    ).resolves.toBe("keep me");
+    await expect(
+      fs.readFile(
+        path.join(cwd, "shared-skills/.npm-skills-manifest.json"),
+        "utf8",
+      ),
+    ).resolves.toContain('"plain-package"');
   });
 
   it("keeps previously extracted skills when a package is temporarily unresolved", async () => {

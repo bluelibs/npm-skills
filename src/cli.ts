@@ -34,6 +34,7 @@ Options:
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
     --dev <true|false> Include devDependencies. Defaults to true
     --override         Replace existing extracted skills without prompting
+    --verbose          Show normal skip diagnostics such as missing skills folders
 
   new:
     --folder <dir>     Template destination root. Defaults to .agents/skills
@@ -113,6 +114,11 @@ function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
 
     if (arg === "--override") {
       options.override = true;
+      continue;
+    }
+
+    if (arg === "--verbose") {
+      options.verbose = true;
       continue;
     }
 
@@ -200,12 +206,25 @@ function createDefaultDependencies(): CliDependencies {
   return {
     stdout: console,
     logger: {
-      info: (message) => console.log(message),
+      info: console.debug,
       warn: (message) => console.warn(message),
     },
     prompt: createInteractivePrompt(isInteractive),
     isInteractive,
   };
+}
+
+function formatExtractSummary(
+  extractedCount: number,
+  scannedPackageCount: number,
+  deletedSkills: number,
+  isInteractive: boolean,
+): string {
+  const checkmark = isInteractive ? "\u001b[32m\u2713\u001b[0m" : "\u2713";
+  const deletedSuffix =
+    deletedSkills > 0 ? ` Deleted skills: ${deletedSkills}` : "";
+
+  return `${checkmark} Imported ${extractedCount} skills from ${scannedPackageCount} total packages.${deletedSuffix}`;
 }
 
 export async function runCli(
@@ -227,16 +246,22 @@ export async function runCli(
     if (parsed.command === "extract") {
       const report = await extractSkills({
         ...parsed.options,
-        logger: dependencies.logger,
+        logger: {
+          // Keep install-time output compact while still surfacing warnings.
+          info: () => undefined,
+          warn: (message) => dependencies.logger.warn(message),
+        },
         prompt: parsed.options.override ? undefined : dependencies.prompt,
       });
 
       dependencies.stdout.log(
-        `Extracted ${report.extracted.length} skill(s) from ${report.scannedPackages.length} package(s) into ${report.outputDir}.`,
+        formatExtractSummary(
+          report.extracted.length,
+          report.scannedPackages.length,
+          report.deletedSkills,
+          dependencies.isInteractive,
+        ),
       );
-      if (report.skipped.length > 0) {
-        dependencies.stdout.log(`Skipped ${report.skipped.length} skill(s).`);
-      }
       return 0;
     }
 

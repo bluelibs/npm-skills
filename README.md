@@ -127,8 +127,9 @@ Overwrite behavior is intentionally conservative:
 - if the destination exists and you pass `--override`, it replaces it fully
 - if the destination exists in an interactive terminal, it asks `y/N`
 - if the destination exists in non-interactive mode, it skips and warns
+- if a package simply has no discoverable skills source, it skips quietly by default because that is normal
 - if a listed package is not currently resolvable from `node_modules`, it skips and warns instead of aborting the whole run
-- full default syncs into `.agents/skills` also remove stale folders from earlier extractions for this repo, without touching unrelated folders or custom output directories
+- full syncs also remove stale folders from earlier extractions in the chosen output directory, without touching unrelated folders there
 
 By default, `npm-skills` scans:
 
@@ -250,6 +251,7 @@ Options:
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
 - `--dev <true|false>`: include dev dependencies, defaults to `true`
 - `--override`: replace existing extracted skills without prompting
+- `--verbose`: show normal skip diagnostics such as packages without a `skills/` folder
 
 Examples:
 
@@ -259,6 +261,7 @@ npx npm-skills extract @bluelibs/runner my-package
 npx npm-skills extract --only "@bluelibs/*" --output .agents/skills
 npx npm-skills extract --dev=false
 npx npm-skills extract --override
+npx npm-skills extract --verbose
 ```
 
 In a monorepo, the default stays local to the package you run from, so `packages/app` extracts into `packages/app/.agents/skills`.
@@ -311,6 +314,7 @@ const report = await extractSkills({
   only: ["@bluelibs/*"],
   includeDevDependencies: true,
   override: false,
+  verbose: false,
 });
 
 console.log(report.extracted);

@@ -181,13 +181,8 @@ function createPackageResolver(cwd: string): (packageName: string) => string {
   return (specifier: string) => requireFromProject.resolve(specifier);
 }
 
-function shouldPruneStaleSkills(
-  options: ExtractOptions,
-  cwd: string,
-  outputDir: string,
-): boolean {
+function shouldPruneStaleSkills(options: ExtractOptions): boolean {
   return (
-    outputDir === path.resolve(cwd, DEFAULT_OUTPUT_DIR) &&
     options.packageNames === undefined &&
     options.only === undefined &&
     (options.includeDevDependencies ?? true)
@@ -245,8 +240,9 @@ export async function extractSkills(
   const outputDir = path.resolve(cwd, options.outputDir ?? DEFAULT_OUTPUT_DIR);
   const includeDevDependencies = options.includeDevDependencies ?? true;
   const override = options.override ?? false;
+  const verbose = options.verbose ?? false;
   const logger = options.logger ?? DEFAULT_LOGGER;
-  const pruneStaleSkills = shouldPruneStaleSkills(options, cwd, outputDir);
+  const pruneStaleSkills = shouldPruneStaleSkills(options);
 
   const projectPackageJson = await readProjectPackageJson(cwd);
   const projectConfig = resolveNpmSkillsConfig(projectPackageJson);
@@ -262,6 +258,7 @@ export async function extractSkills(
     scannedPackages,
     extracted: [],
     skipped: [],
+    deletedSkills: 0,
   };
   const previousManifest = pruneStaleSkills
     ? await readExtractManifest(outputDir)
@@ -329,7 +326,9 @@ export async function extractSkills(
         destinationDir: outputDir,
         reason: "missing-source",
       });
-      logger.warn(`No skills found for ${packageName} at ${sourceRoot}`);
+      if (verbose) {
+        logger.warn(`No skills found for ${packageName} at ${sourceRoot}`);
+      }
       continue;
     }
 
@@ -432,6 +431,7 @@ export async function extractSkills(
         recursive: true,
         force: true,
       });
+      report.deletedSkills += 1;
       logger.info(`Removed stale ${destinationName}`);
     }
 

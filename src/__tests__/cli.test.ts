@@ -63,6 +63,7 @@ describe("cli", () => {
         "--only=@bluelibs/*,left-pad",
         "--dev=false",
         "--override",
+        "--verbose",
       ]),
     ).toEqual({
       command: "extract",
@@ -72,6 +73,7 @@ describe("cli", () => {
         only: ["@bluelibs/*", "left-pad"],
         includeDevDependencies: false,
         override: true,
+        verbose: true,
       },
     });
 
@@ -190,18 +192,23 @@ describe("cli", () => {
           reason: "missing-source",
         },
       ],
+      deletedSkills: 2,
     });
 
     const dependencies = createDependencies();
     await expect(runCli(["extract"], dependencies)).resolves.toBe(0);
-    expect(extractSkills).toHaveBeenCalledWith({
-      logger: dependencies.logger,
-      prompt: dependencies.prompt,
-    });
     expect(dependencies.stdout.log).toHaveBeenCalledWith(
-      "Extracted 1 skill(s) from 2 package(s) into /tmp/skills.",
+      "\u001b[32m\u2713\u001b[0m Imported 1 skills from 2 total packages. Deleted skills: 2",
     );
-    expect(dependencies.stdout.log).toHaveBeenCalledWith("Skipped 1 skill(s).");
+    const callOptions = extractSkills.mock.calls.at(-1)?.[0] as {
+      logger: Logger;
+      prompt?: OverwritePrompt;
+    };
+    expect(callOptions.prompt).toBe(dependencies.prompt);
+    callOptions.logger.info("hidden");
+    callOptions.logger.warn("heads-up");
+    expect(dependencies.logger.info).not.toHaveBeenCalled();
+    expect(dependencies.logger.warn).toHaveBeenCalledWith("heads-up");
   });
 
   it("creates a skill template and reports its location", async () => {
@@ -240,21 +247,26 @@ describe("cli", () => {
       scannedPackages: [],
       extracted: [],
       skipped: [],
+      deletedSkills: 0,
     });
 
     const firstDependencies = createDependencies();
     await expect(
       runCli(
-        ["extract", "--override", "--output", "skills"],
+        ["extract", "--override", "--output", "skills", "--verbose"],
         firstDependencies,
       ),
     ).resolves.toBe(0);
-    expect(extractSkills).toHaveBeenLastCalledWith({
-      outputDir: "skills",
-      override: true,
-      logger: firstDependencies.logger,
-      prompt: undefined,
-    });
+    const firstCallOptions = extractSkills.mock.calls.at(-1)?.[0] as {
+      outputDir: string;
+      override: boolean;
+      verbose: boolean;
+      prompt?: OverwritePrompt;
+    };
+    expect(firstCallOptions.outputDir).toBe("skills");
+    expect(firstCallOptions.override).toBe(true);
+    expect(firstCallOptions.verbose).toBe(true);
+    expect(firstCallOptions.prompt).toBeUndefined();
 
     extractSkills.mockRejectedValueOnce(new Error("boom"));
     const secondDependencies = createDependencies();
@@ -284,6 +296,7 @@ describe("cli", () => {
       scannedPackages: [],
       extracted: [],
       skipped: [],
+      deletedSkills: 0,
     });
 
     const originalStdinIsTTY = process.stdin.isTTY;
@@ -315,9 +328,8 @@ describe("cli", () => {
     callOptions.logger.warn("heads-up");
 
     expect(logSpy).toHaveBeenCalledWith(
-      "Extracted 0 skill(s) from 0 package(s) into /tmp/skills.",
+      "\u001b[32m\u2713\u001b[0m Imported 0 skills from 0 total packages.",
     );
-    expect(logSpy).toHaveBeenCalledWith("hello");
     expect(warnSpy).toHaveBeenCalledWith("heads-up");
     expect(errorSpy).not.toHaveBeenCalled();
 
@@ -329,5 +341,22 @@ describe("cli", () => {
       configurable: true,
       value: originalStdoutIsTTY,
     });
+  });
+
+  it("uses a plain checkmark when the cli is not interactive", async () => {
+    extractSkills.mockResolvedValue({
+      outputDir: "/tmp/skills",
+      scannedPackages: ["pkg-a"],
+      extracted: [],
+      skipped: [],
+      deletedSkills: 0,
+    });
+
+    const dependencies = createDependencies({ isInteractive: false });
+    await expect(runCli(["extract"], dependencies)).resolves.toBe(0);
+
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(
+      "\u2713 Imported 0 skills from 1 total packages.",
+    );
   });
 });

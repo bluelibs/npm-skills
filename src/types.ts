@@ -61,6 +61,7 @@ export interface ExtractOptions {
   packageNames?: string[];
   includeDevDependencies?: boolean;
   override?: boolean;
+  verbose?: boolean;
   logger?: Logger;
   prompt?: OverwritePrompt;
 }
@@ -98,6 +99,7 @@ export interface ExtractReport {
   scannedPackages: string[];
   extracted: ExtractedSkill[];
   skipped: SkippedSkill[];
+  deletedSkills: number;
 }
 
 export interface CreateSkillTemplateOptions {
