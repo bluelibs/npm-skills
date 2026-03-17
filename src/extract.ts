@@ -2,7 +2,6 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { createRequire } from "node:module";
 import {
-  DEFAULT_OUTPUT_DIR,
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
   readInstalledPackageJson,
@@ -237,7 +236,6 @@ export async function extractSkills(
   options: ExtractOptions = {},
 ): Promise<ExtractReport> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const outputDir = path.resolve(cwd, options.outputDir ?? DEFAULT_OUTPUT_DIR);
   const includeDevDependencies = options.includeDevDependencies ?? true;
   const override = options.override ?? false;
   const verbose = options.verbose ?? false;
@@ -246,6 +244,10 @@ export async function extractSkills(
 
   const projectPackageJson = await readProjectPackageJson(cwd);
   const projectConfig = resolveNpmSkillsConfig(projectPackageJson);
+  const outputDir = path.resolve(
+    cwd,
+    options.outputDir ?? projectConfig.consume.output,
+  );
   const packageFilters = getPackageFilters(options, projectConfig.consume.only);
   const scannedPackages = getDependencyPackageNames(
     projectPackageJson,

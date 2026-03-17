@@ -92,6 +92,65 @@ If you want skills to stay automatically synced after installs, wire it into `po
 
 If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
 
+## Skill Sharing Pattern
+
+If your repo both authors its own skills and extracts skills from dependencies, prefer giving extracted content its own lane under `.agents/skills/extracted`.
+
+This is a recommended pattern, not the default. If you do nothing, extraction still defaults to `.agents/skills`.
+
+That keeps local skills easy to curate, keeps sync cleanup scoped to imported content, and keeps Git from collecting extracted folders like a very enthusiastic raccoon.
+
+Recommended layout:
+
+```txt
+.agents/
+  skills/
+    my-local-skill/
+      SKILL.md
+    extracted/
+      .gitignore
+      bluelibs-runner-release-notes/
+```
+
+Use a dedicated `.gitignore` in that extraction folder:
+
+```gitignore
+*
+```
+
+Quick setup:
+
+Make sure `.agents/skills/extracted` exists, then run:
+
+```bash
+printf "*\n" > .agents/skills/extracted/.gitignore
+npx npm-skills extract --output .agents/skills/extracted
+```
+
+Script example:
+
+```json
+{
+  "scripts": {
+    "skills:extract": "npm-skills extract --output .agents/skills/extracted"
+  }
+}
+```
+
+`package.json` setting example:
+
+```json
+{
+  "npmSkills": {
+    "consume": {
+      "output": ".agents/skills/extracted"
+    }
+  }
+}
+```
+
+`--output` still overrides the package setting when you need a one-off destination.
+
 ## How Extraction Works
 
 Skill discovery stays predictable:
@@ -156,6 +215,7 @@ Example:
   "npmSkills": {
     "consume": {
       "only": ["@scope/*", "my-package"],
+      "output": ".agents/skills/extracted",
       "map": {
         "@bluelibs/runner": ".agents/skills",
         "some-package": "resources/skills"
@@ -180,6 +240,13 @@ Example:
 - Optional per-package source folder overrides
 - Default source folder is `skills`
 - Values are resolved relative to the installed package folder
+
+`consume.output`
+
+- Optional default extraction destination for this consumer project
+- Defaults to `.agents/skills`
+- Useful when you want extracted skills to live under `.agents/skills/extracted`
+- `--output` on the CLI and `outputDir` in the API still override it
 
 `publish.source`
 
@@ -247,7 +314,7 @@ npx npm-skills extract [package-a package-b ...] [options]
 
 Options:
 
-- `--output <dir>`: destination folder, defaults to `.agents/skills`
+- `--output <dir>`: destination folder, overrides `npmSkills.consume.output` or defaults to `.agents/skills`
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
 - `--dev <true|false>`: include dev dependencies, defaults to `true`
 - `--override`: replace existing extracted skills without prompting

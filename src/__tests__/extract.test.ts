@@ -163,6 +163,95 @@ describe("extractSkills", () => {
     }
   });
 
+  it("uses npmSkills.consume.output as the default extraction directory", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/extracted",
+        },
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    const report = await extractSkills({ cwd });
+
+    expect(await fs.realpath(report.outputDir)).toBe(
+      await fs.realpath(path.join(cwd, ".agents/skills/extracted")),
+    );
+    await expect(
+      fs.readFile(
+        path.join(
+          cwd,
+          ".agents/skills/extracted/default-package-basic/SKILL.md",
+        ),
+        "utf8",
+      ),
+    ).resolves.toBe("# Basic\n");
+  });
+
+  it("lets explicit outputDir override npmSkills.consume.output", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/extracted",
+        },
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    const report = await extractSkills({
+      cwd,
+      outputDir: "shared-skills",
+    });
+
+    expect(await fs.realpath(report.outputDir)).toBe(
+      await fs.realpath(path.join(cwd, "shared-skills")),
+    );
+    await expect(
+      fs.readFile(
+        path.join(cwd, "shared-skills/default-package-basic/SKILL.md"),
+        "utf8",
+      ),
+    ).resolves.toBe("# Basic\n");
+    await expect(
+      fs.access(
+        path.join(cwd, ".agents/skills/extracted/default-package-basic"),
+      ),
+    ).rejects.toThrow();
+  });
+
   it("skips missing installed packages instead of aborting the whole run", async () => {
     const cwd = await createTempProject();
     const { logger, messages } = createLogger();

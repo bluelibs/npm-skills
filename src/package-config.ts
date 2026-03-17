@@ -3,6 +3,7 @@ import * as path from "node:path";
 import {
   DependencySection,
   InstalledPackageJson,
+  NpmSkillsConsumeConfig,
   NpmSkillsConfig,
   NpmSkillsPublishConfig,
   ProjectPackageJson,
@@ -15,6 +16,12 @@ export const DEFAULT_SKILLS_DIR = "skills";
 export const DEFAULT_OUTPUT_DIR = ".agents/skills";
 
 function isNpmSkillsConfig(value: unknown): value is NpmSkillsConfig {
+  return Boolean(value) && typeof value === "object";
+}
+
+function isNpmSkillsConsumeConfig(
+  value: unknown,
+): value is NpmSkillsConsumeConfig {
   return Boolean(value) && typeof value === "object";
 }
 
@@ -36,17 +43,26 @@ function resolveStringMap(
 }
 
 function resolveConsumeConfig(
-  config: NpmSkillsConfig | undefined,
+  config: NpmSkillsConfig | NpmSkillsConsumeConfig | undefined,
 ): ResolvedNpmSkillsConsumeConfig {
-  const nestedConsume = isNpmSkillsConfig(config?.consume)
-    ? config.consume
-    : {};
+  const nestedConsume: NpmSkillsConsumeConfig =
+    config && "consume" in config
+      ? isNpmSkillsConsumeConfig(config.consume)
+        ? config.consume
+        : {}
+      : isNpmSkillsConsumeConfig(config)
+        ? config
+        : {};
 
   return {
     only: resolveStringArray(nestedConsume.only) ?? [],
     map: {
       ...resolveStringMap(nestedConsume.map),
     },
+    output:
+      typeof nestedConsume.output === "string"
+        ? nestedConsume.output
+        : DEFAULT_OUTPUT_DIR,
   };
 }
 
@@ -133,6 +149,7 @@ export function resolveNpmSkillsConfig(
     consume: {
       only: only ?? [],
       map: consume.map,
+      output: consume.output,
     },
     publish: resolvePublishConfig(packageJson),
   };
@@ -169,6 +186,7 @@ export function getDependencyPackageNames(
 export function getPackageSkillSourceDir(
   packageName: string,
   config:
+    | NpmSkillsConsumeConfig
     | NpmSkillsConfig
     | ResolvedNpmSkillsConfig
     | ResolvedNpmSkillsConsumeConfig,
@@ -177,7 +195,7 @@ export function getPackageSkillSourceDir(
     return config.consume?.map?.[packageName] ?? DEFAULT_SKILLS_DIR;
   }
 
-  if ("only" in config) {
+  if ("only" in config || "map" in config || "output" in config) {
     return config.map?.[packageName] ?? DEFAULT_SKILLS_DIR;
   }
 

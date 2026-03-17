@@ -7,6 +7,7 @@ export type DependencySection =
 export interface NpmSkillsConsumeConfig {
   only?: string[];
   map?: Record<string, string>;
+  output?: string;
 }
 
 export interface NpmSkillsPublishConfig {
@@ -22,6 +23,7 @@ export interface NpmSkillsConfig {
 export interface ResolvedNpmSkillsConsumeConfig {
   only: string[];
   map: Record<string, string>;
+  output: string;
 }
 
 export interface ResolvedNpmSkillsPublishConfig {

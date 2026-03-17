@@ -30,7 +30,7 @@ Usage:
 
 Options:
   extract:
-    --output <dir>     Destination directory. Defaults to .agents/skills
+    --output <dir>     Destination directory. Overrides npmSkills.consume.output or .agents/skills
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
     --dev <true|false> Include devDependencies. Defaults to true
     --override         Replace existing extracted skills without prompting

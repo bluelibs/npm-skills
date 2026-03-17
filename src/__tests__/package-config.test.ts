@@ -19,6 +19,7 @@ describe("package-config", () => {
       npmSkills: {
         consume: {
           only: ["consume-only"],
+          output: ".agents/skills/extracted",
           map: {
             mappedConsume: ".consume/mapped-skills",
           },
@@ -36,6 +37,7 @@ describe("package-config", () => {
         map: {
           mappedConsume: ".consume/mapped-skills",
         },
+        output: ".agents/skills/extracted",
       },
       publish: {
         source: ".agents/skills",
@@ -67,10 +69,32 @@ describe("package-config", () => {
       consume: {
         only: ["modern-only"],
         map: {},
+        output: DEFAULT_OUTPUT_DIR,
       },
       publish: {
         source: ".modern/publish",
         exports: ["modern"],
+        disabled: false,
+      },
+    });
+  });
+
+  it("falls back to consume defaults when npmSkills.consume is not an object", () => {
+    expect(
+      resolveNpmSkillsConfig({
+        npmSkills: {
+          consume: true as never,
+        },
+      }),
+    ).toEqual({
+      consume: {
+        only: [],
+        map: {},
+        output: DEFAULT_OUTPUT_DIR,
+      },
+      publish: {
+        source: DEFAULT_SKILLS_DIR,
+        exports: [],
         disabled: false,
       },
     });
@@ -113,7 +137,20 @@ describe("package-config", () => {
     ).toBe(".mapped/skills");
     expect(
       getPackageSkillSourceDir("@bluelibs/runner", {
+        map: {
+          "@bluelibs/runner": ".raw-consume/skills",
+        },
+      }),
+    ).toBe(".raw-consume/skills");
+    expect(
+      getPackageSkillSourceDir("@bluelibs/runner", {
+        output: ".agents/skills/extracted",
+      }),
+    ).toBe(DEFAULT_SKILLS_DIR);
+    expect(
+      getPackageSkillSourceDir("@bluelibs/runner", {
         consume: {
+          output: DEFAULT_OUTPUT_DIR,
           map: {
             "@bluelibs/runner": ".consume/skills",
           },
@@ -122,7 +159,9 @@ describe("package-config", () => {
     ).toBe(".consume/skills");
     expect(
       getPackageSkillSourceDir("@bluelibs/runner", {
-        consume: {},
+        consume: {
+          output: DEFAULT_OUTPUT_DIR,
+        },
       }),
     ).toBe(DEFAULT_SKILLS_DIR);
     expect(
