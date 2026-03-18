@@ -32,7 +32,7 @@ Options:
   extract:
     --output <dir>     Destination directory. Overrides npmSkills.consume.output or .agents/skills
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
-    --env <name>       Only run when NODE_ENV matches exactly
+    --skip-production  Skip extraction when NODE_ENV is production
     --devDependencies <true|false> Include devDependencies. Defaults to true
     --dev <true|false> Deprecated alias for --devDependencies
     --override         Replace existing extracted skills without prompting
@@ -98,14 +98,8 @@ function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
       continue;
     }
 
-    if (arg === "--env") {
-      options.env = getRequiredOptionValue(rest, index, "--env");
-      index++;
-      continue;
-    }
-
-    if (arg.startsWith("--env=")) {
-      options.env = arg.slice("--env=".length);
+    if (arg === "--skip-production") {
+      options.skipProduction = true;
       continue;
     }
 
@@ -271,11 +265,6 @@ export async function runCli(
       });
 
       if (report.skippedEnvironment) {
-        const currentEnvironment =
-          report.skippedEnvironment.received ?? "undefined";
-        dependencies.stdout.log(
-          `Skipped extraction because NODE_ENV is ${currentEnvironment}, expected ${report.skippedEnvironment.expected}.`,
-        );
         return 0;
       }
 

@@ -61,7 +61,7 @@ describe("cli", () => {
         "@bluelibs/runner",
         "--output=.agents/skills",
         "--only=@bluelibs/*,left-pad",
-        "--env=development",
+        "--skip-production",
         "--devDependencies=false",
         "--override",
         "--verbose",
@@ -72,7 +72,7 @@ describe("cli", () => {
         packageNames: ["@bluelibs/runner"],
         outputDir: ".agents/skills",
         only: ["@bluelibs/*", "left-pad"],
-        env: "development",
+        skipProduction: true,
         includeDevDependencies: false,
         override: true,
         verbose: true,
@@ -157,9 +157,6 @@ describe("cli", () => {
     );
     expect(() => parseCliArgs(["extract", "--only", "--override"])).toThrow(
       "Missing value for --only",
-    );
-    expect(() => parseCliArgs(["extract", "--env"])).toThrow(
-      "Missing value for --env",
     );
     expect(() => parseCliArgs(["extract", "--devDependencies=maybe"])).toThrow(
       "Invalid boolean value: maybe",
@@ -379,7 +376,7 @@ describe("cli", () => {
     );
   });
 
-  it("prints a dedicated message when extraction is skipped by env", async () => {
+  it("returns success without stdout when extraction is skipped in production", async () => {
     extractSkills.mockResolvedValue({
       outputDir: "/tmp/skills",
       scannedPackages: [],
@@ -387,40 +384,16 @@ describe("cli", () => {
       skipped: [],
       deletedSkills: 0,
       skippedEnvironment: {
-        expected: "development",
+        reason: "production",
         received: "production",
       },
     });
 
     const dependencies = createDependencies();
     await expect(
-      runCli(["extract", "--env", "development"], dependencies),
+      runCli(["extract", "--skip-production"], dependencies),
     ).resolves.toBe(0);
 
-    expect(dependencies.stdout.log).toHaveBeenCalledWith(
-      "Skipped extraction because NODE_ENV is production, expected development.",
-    );
-  });
-
-  it("uses undefined in the env skip message when NODE_ENV is absent", async () => {
-    extractSkills.mockResolvedValue({
-      outputDir: "/tmp/skills",
-      scannedPackages: [],
-      extracted: [],
-      skipped: [],
-      deletedSkills: 0,
-      skippedEnvironment: {
-        expected: "development",
-      },
-    });
-
-    const dependencies = createDependencies();
-    await expect(
-      runCli(["extract", "--env", "development"], dependencies),
-    ).resolves.toBe(0);
-
-    expect(dependencies.stdout.log).toHaveBeenCalledWith(
-      "Skipped extraction because NODE_ENV is undefined, expected development.",
-    );
+    expect(dependencies.stdout.log).not.toHaveBeenCalled();
   });
 });

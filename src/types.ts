@@ -61,7 +61,7 @@ export interface ExtractOptions {
   outputDir?: string;
   only?: string[];
   packageNames?: string[];
-  env?: string;
+  skipProduction?: boolean;
   includeDevDependencies?: boolean;
   override?: boolean;
   verbose?: boolean;
@@ -104,8 +104,8 @@ export interface ExtractReport {
   skipped: SkippedSkill[];
   deletedSkills: number;
   skippedEnvironment?: {
-    expected: string;
-    received?: string;
+    reason: "production";
+    received: string;
   };
 }
 

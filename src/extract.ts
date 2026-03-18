@@ -248,7 +248,7 @@ export async function extractSkills(
   options: ExtractOptions = {},
 ): Promise<ExtractReport> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
-  const requiredEnvironment = options.env?.trim();
+  const skipProduction = options.skipProduction ?? false;
   const includeDevDependencies = options.includeDevDependencies ?? true;
   const override = options.override ?? false;
   const verbose = options.verbose ?? false;
@@ -276,17 +276,17 @@ export async function extractSkills(
     deletedSkills: 0,
   };
 
-  if (requiredEnvironment) {
+  if (skipProduction) {
     const currentEnvironment = readEnvironmentVariable("NODE_ENV");
-    if (currentEnvironment !== requiredEnvironment) {
+    if (currentEnvironment === "production") {
       logger.info(
-        `Skipped extraction because NODE_ENV is ${currentEnvironment ?? "undefined"}, expected ${requiredEnvironment}.`,
+        `Skipped extraction because NODE_ENV is ${currentEnvironment}.`,
       );
       return {
         ...report,
         scannedPackages: [],
         skippedEnvironment: {
-          expected: requiredEnvironment,
+          reason: "production",
           received: currentEnvironment,
         },
       };

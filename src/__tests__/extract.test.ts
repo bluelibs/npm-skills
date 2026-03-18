@@ -205,7 +205,7 @@ describe("extractSkills", () => {
     ).resolves.toBe("# Basic\n");
   });
 
-  it("skips extraction when NODE_ENV does not match the required env", async () => {
+  it("skips extraction when skipProduction is enabled and NODE_ENV is production", async () => {
     const cwd = await createTempProject();
     const previousNodeEnv = process.env.NODE_ENV;
 
@@ -233,7 +233,7 @@ describe("extractSkills", () => {
     try {
       const report = await extractSkills({
         cwd,
-        env: "development",
+        skipProduction: true,
         logger,
       });
 
@@ -242,14 +242,14 @@ describe("extractSkills", () => {
       expect(report.skipped).toEqual([]);
       expect(report.deletedSkills).toBe(0);
       expect(report.skippedEnvironment).toEqual({
-        expected: "development",
+        reason: "production",
         received: "production",
       });
       await expect(
         fs.access(path.join(cwd, ".agents/skills")),
       ).rejects.toThrow();
       expect(messages.info).toEqual([
-        "Skipped extraction because NODE_ENV is production, expected development.",
+        "Skipped extraction because NODE_ENV is production.",
       ]);
       expect(messages.warn).toEqual([]);
     } finally {
@@ -261,7 +261,7 @@ describe("extractSkills", () => {
     }
   });
 
-  it("reports undefined when env-gated extraction has no NODE_ENV", async () => {
+  it("continues extraction when skipProduction is enabled and NODE_ENV is undefined", async () => {
     const cwd = await createTempProject();
     const previousNodeEnv = process.env.NODE_ENV;
     const previousDeno = Reflect.get(globalThis, "Deno");
@@ -295,16 +295,15 @@ describe("extractSkills", () => {
     try {
       const report = await extractSkills({
         cwd,
-        env: "development",
+        skipProduction: true,
         logger,
       });
 
-      expect(report.skippedEnvironment).toEqual({
-        expected: "development",
-      });
-      expect(messages.info).toEqual([
-        "Skipped extraction because NODE_ENV is undefined, expected development.",
+      expect(report.skippedEnvironment).toBeUndefined();
+      expect(report.extracted.map((entry) => entry.destinationName)).toEqual([
+        "default-package-basic",
       ]);
+      expect(messages.info).toEqual(["Extracted default-package-basic"]);
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;
@@ -320,7 +319,7 @@ describe("extractSkills", () => {
     }
   });
 
-  it("falls back to Deno.env.get for env-gated extraction", async () => {
+  it("falls back to Deno.env.get when skipping production", async () => {
     const cwd = await createTempProject();
     const previousNodeEnv = process.env.NODE_ENV;
     const previousDeno = Reflect.get(globalThis, "Deno");
@@ -347,21 +346,27 @@ describe("extractSkills", () => {
     Reflect.set(globalThis, "Deno", {
       env: {
         get(name: string) {
-          return name === "NODE_ENV" ? "development" : undefined;
+          return name === "NODE_ENV" ? "production" : undefined;
         },
       },
     });
 
+    const { logger, messages } = createLogger();
+
     try {
       const report = await extractSkills({
         cwd,
-        env: "development",
-        override: true,
+        skipProduction: true,
+        logger,
       });
 
-      expect(report.skippedEnvironment).toBeUndefined();
-      expect(report.extracted.map((entry) => entry.destinationName)).toEqual([
-        "default-package-basic",
+      expect(report.skippedEnvironment).toEqual({
+        reason: "production",
+        received: "production",
+      });
+      expect(report.extracted).toEqual([]);
+      expect(messages.info).toEqual([
+        "Skipped extraction because NODE_ENV is production.",
       ]);
     } finally {
       if (previousNodeEnv === undefined) {
@@ -378,7 +383,7 @@ describe("extractSkills", () => {
     }
   });
 
-  it("ignores non-string Deno env values for env-gated extraction", async () => {
+  it("ignores non-string Deno env values when skipping production", async () => {
     const cwd = await createTempProject();
     const previousNodeEnv = process.env.NODE_ENV;
     const previousDeno = Reflect.get(globalThis, "Deno");
@@ -414,16 +419,15 @@ describe("extractSkills", () => {
     try {
       const report = await extractSkills({
         cwd,
-        env: "development",
+        skipProduction: true,
         logger,
       });
 
-      expect(report.skippedEnvironment).toEqual({
-        expected: "development",
-      });
-      expect(messages.info).toEqual([
-        "Skipped extraction because NODE_ENV is undefined, expected development.",
+      expect(report.skippedEnvironment).toBeUndefined();
+      expect(report.extracted.map((entry) => entry.destinationName)).toEqual([
+        "default-package-basic",
       ]);
+      expect(messages.info).toEqual(["Extracted default-package-basic"]);
     } finally {
       if (previousNodeEnv === undefined) {
         delete process.env.NODE_ENV;

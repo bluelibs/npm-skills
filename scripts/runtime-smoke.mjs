@@ -38,6 +38,11 @@ function assertIncludes(haystack, needle, label) {
   throw new Error(`${label} did not include ${JSON.stringify(needle)}.\n${haystack}`);
 }
 
+function assertEmpty(value, label) {
+  if (value === "") return;
+  throw new Error(`${label} was expected to be empty.\n${value}`);
+}
+
 async function createSmokeProject() {
   const cwd = await mkdtemp(path.join(os.tmpdir(), "npm-skills-runtime-"));
   await writeFile(
@@ -87,28 +92,28 @@ async function runSmoke(runtime) {
     assertSuccess(helpResult, `${runtime} help`);
     assertIncludes(helpResult.stdout, "npm-skills", `${runtime} help`);
 
-    const skippedResult = runCommand(runtime, [...baseArgs, "extract", "--env", "development"], {
-      cwd: projectCwd,
-      env: {
-        ...process.env,
-        NODE_ENV: "production",
-      },
-    });
-    assertSuccess(skippedResult, `${runtime} env gate`);
-    assertIncludes(
-      skippedResult.stdout,
-      "Skipped extraction because NODE_ENV is production, expected development.",
-      `${runtime} env gate`,
-    );
-
-    const extractResult = runCommand(
+    const skippedResult = runCommand(
       runtime,
-      [...baseArgs, "extract", "--env", "development", "--override"],
+      [...baseArgs, "extract", "--skip-production"],
       {
         cwd: projectCwd,
         env: {
           ...process.env,
-          NODE_ENV: "development",
+          NODE_ENV: "production",
+        },
+      },
+    );
+    assertSuccess(skippedResult, `${runtime} env gate`);
+    assertEmpty(skippedResult.stdout, `${runtime} env gate stdout`);
+
+    const extractResult = runCommand(
+      runtime,
+      [...baseArgs, "extract", "--skip-production", "--override"],
+      {
+        cwd: projectCwd,
+        env: {
+          ...process.env,
+          NODE_ENV: "",
         },
       },
     );

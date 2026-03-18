@@ -38,8 +38,8 @@ It follows conventions people already recognize from the [`skills.sh` ecosystem]
 `npm-skills` officially targets Node `>=22`.
 
 - Node: officially supported for both the CLI and programmatic API
-- Bun: supported for CLI usage, including `--env`
-- Deno: supported for CLI usage through the CommonJS entry, including the `NODE_ENV` fallback via `Deno.env.get("NODE_ENV")`
+- Bun: supported for CLI usage, including `--skip-production`
+- Deno: supported for CLI usage through the CommonJS entry, including the `NODE_ENV` fallback via `Deno.env.get("NODE_ENV")` for `--skip-production`
 
 The CLI is the primary way this package is meant to be used. In most projects you will not need the programmatic API at all, which is nice because we all deserve at least one tool in life that does not begin with "first, write a wrapper."
 
@@ -67,7 +67,7 @@ bunx npm-skills extract
 Deno users can run the packaged CommonJS CLI entry directly:
 
 ```bash
-deno run -A ./node_modules/npm-skills/dist/bin.cjs extract --env development
+deno run -A ./node_modules/npm-skills/dist/bin.cjs extract --skip-production
 ```
 
 Add a script:
@@ -91,12 +91,12 @@ If you want skills to stay automatically synced after installs, install `npm-ski
 ```json
 {
   "scripts": {
-    "postinstall": "npm-skills extract --env development --override"
+    "postinstall": "npm-skills extract --skip-production --override"
   }
 }
 ```
 
-That keeps the binary available in environments where `postinstall` runs, and `--env development` makes the command exit cleanly unless the current `NODE_ENV` is exactly `development`.
+That keeps the binary available in environments where `postinstall` runs, and `--skip-production` makes the command exit cleanly and silently when `NODE_ENV` is `production`.
 
 If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
 
@@ -331,7 +331,7 @@ Options:
 
 - `--output <dir>`: destination folder, overrides `npmSkills.consume.output` or defaults to `.agents/skills`
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
-- `--env <name>`: only run when `NODE_ENV` matches exactly
+- `--skip-production`: skip extraction when `NODE_ENV` is `production`
 - `--devDependencies <true|false>`: include dev dependencies in the package scan, defaults to `true`
 - `--dev <true|false>`: deprecated alias for `--devDependencies`
 - `--override`: replace existing extracted skills without prompting
@@ -343,13 +343,13 @@ Examples:
 npm-skills extract
 npm-skills extract @bluelibs/runner my-package
 npm-skills extract --only "@bluelibs/*" --output .agents/skills
-npm-skills extract --env development
+npm-skills extract --skip-production
 npm-skills extract --devDependencies=false
 npm-skills extract --override
 npm-skills extract --verbose
 ```
 
-`--env` controls whether extraction runs at all for the current `NODE_ENV`. `--devDependencies` controls whether `devDependencies` are included in the package scan. The old `--dev` flag is still accepted as an alias for compatibility, but `--devDependencies` is the clearer name going forward.
+`--skip-production` only skips extraction when the current `NODE_ENV` is `production`. If `NODE_ENV` is unset, extraction still runs. `--devDependencies` controls whether `devDependencies` are included in the package scan. The old `--dev` flag is still accepted as an alias for compatibility, but `--devDependencies` is the clearer name going forward.
 
 In a monorepo, the default stays local to the package you run from, so `packages/app` extracts into `packages/app/.agents/skills`.
 
@@ -399,7 +399,7 @@ const report = await extractSkills({
   cwd: process.cwd(),
   outputDir: ".agents/skills",
   only: ["@bluelibs/*"],
-  env: "development",
+  skipProduction: true,
   includeDevDependencies: true,
   override: false,
   verbose: false,
@@ -446,8 +446,8 @@ interface ExtractReport {
       | "package-opt-out";
   }>;
   skippedEnvironment?: {
-    expected: string;
-    received?: string;
+    reason: "production";
+    received: string;
   };
 }
 ```
