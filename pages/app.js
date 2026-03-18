@@ -14,6 +14,7 @@ const devEventsPath = "/__dev/events";
 
 let activeHeadingObserver;
 let activeMarkdown = "";
+let hasRevealedPage = false;
 
 void initializePage();
 
@@ -32,13 +33,29 @@ async function initializePage() {
 
     renderStatus.textContent = "";
     renderStatus.classList.add("is-ready");
+    revealPage();
   } catch (error) {
     console.error(error);
     renderStatus.textContent =
       "The README refused to put on its formalwear. Please check README.md deployment.";
     renderStatus.classList.add("is-error");
     tocStatus.textContent = "Map unavailable";
+    revealPage();
   }
+}
+
+function revealPage() {
+  if (hasRevealedPage) {
+    return;
+  }
+
+  hasRevealedPage = true;
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      document.body.classList.add("is-page-ready");
+    });
+  });
 }
 
 function sanitizeRenderedMarkdown(html) {

@@ -2,8 +2,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" alt="Node 22+" />
   <img src="https://img.shields.io/badge/coverage-100%25-16a34a" alt="100% test coverage" />
-  <img src="https://img.shields.io/badge/bun-exp-f9f1e1?logo=bun&logoColor=111111" alt="Bun experimental" />
-  <img src="https://img.shields.io/badge/deno-exp-000000?logo=deno&logoColor=white" alt="Deno experimental" />
+  <img src="https://img.shields.io/badge/bun-stable-f9f1e1?logo=bun&logoColor=111111" alt="Bun stable" />
+  <img src="https://img.shields.io/badge/deno-stable-000000?logo=deno&logoColor=white" alt="Deno stable" />
   <br />
   <img src="https://img.shields.io/badge/linux-fcc624?logo=linux&logoColor=111111" alt="Linux" />
   <img src="https://img.shields.io/badge/macos-111111?logo=apple&logoColor=white" alt="macOS" />
@@ -18,8 +18,6 @@
 
 If a package exposes a `skills/` folder containing one or more skill directories with a `SKILL.md`, this tool can extract them into your local `.agents/skills` folder with one command, keeping the output in the current project even when you run it from `packages/*` and fitting neatly into AGENTS.md-style repos.
 
-That means package authors get a predictable convention, and consumers get a clean DX instead of custom copy scripts, mystery folders, and ritual sacrifice to the filesystem gods.
-
 ## Overview
 
 `npm-skills` is for shipping skills inside ordinary npm packages, versioning them with `package.json`, moving them through private registries, and extracting them into the workspace where they are actually used.
@@ -31,15 +29,13 @@ It follows conventions people already recognize from the [`skills.sh` ecosystem]
 - packages usually publish from `skills/`
 - consuming projects usually extract into `.agents/skills/`
 
-`skills.sh` is a strong fit when you want a hosted catalog and public discovery. `npm-skills` is for distributing skills as part of your dependency graph.
-
 `npm-skills` officially targets Node `>=22`.
 
 - Node: officially supported for both the CLI and programmatic API
-- Bun: the published artifacts may work, but Bun is not officially tested yet
-- Deno: the published artifacts may work with the usual file and system permissions, but Deno is not officially tested yet
+- Bun: supported for CLI and programmatic usage; dependency lifecycle automation requires `trustedDependencies`
+- Deno: supported for CLI and programmatic usage; dependency lifecycle automation requires `--allow-scripts` plus a local `node_modules` mode
 
-The CLI is the primary way this package is meant to be used. In most projects you will not need the programmatic API at all, which is nice because we all deserve at least one tool in life that does not begin with "first, write a wrapper."
+The CLI is the primary interface. Most projects do not need the programmatic API.
 
 ## Quick Start
 
@@ -56,10 +52,16 @@ npx npm-skills extract
 npx npm-skills --help
 ```
 
-Bun users can skip the `n` and keep their startup time smug:
+Bun users can run:
 
 ```bash
 bunx npm-skills extract
+```
+
+Deno can run the published npm binary directly:
+
+```bash
+deno run -A npm:npm-skills extract
 ```
 
 Add a script:
@@ -78,19 +80,53 @@ Then run:
 npm run skills:extract
 ```
 
-If you want skills to stay automatically synced after installs, wire it into `prepare`:
+If you want overwrites to stay explicit, make that part of the command you run yourself:
 
 ```json
 {
   "scripts": {
-    "prepare": "npm-skills extract --override"
+    "skills:extract:override": "npm-skills extract --override"
   }
 }
 ```
 
-`prepare` runs after every `npm install` in development but is skipped in production installs (`--omit=dev`), so the script won't fail when `npm-skills` is a devDependency and the binary is absent. Avoid `postinstall` for this reason.
+If you want `npm-skills` to handle this automatically without adding consumer scripts, opt in with `npmSkills.auto`:
 
-If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `prepare`.
+```json
+{
+  "devDependencies": {
+    "npm-skills": "^0.2.1"
+  },
+  "npmSkills": {
+    "auto": true
+  }
+}
+```
+
+When `auto` is `true`, the `npm-skills` package runs its own install hook and extracts with overwrite enabled during development-like installs only. It skips production-like installs such as `NODE_ENV=production`, `npm_config_production=true`, or installs that omit dev dependencies, which keeps the common `devDependency` setup safe.
+
+If `auto` is `false` or omitted, nothing runs automatically and you keep using `npm-skills extract` yourself.
+
+For Bun installs, dependency lifecycle scripts are blocked by default. Add `npm-skills` to `trustedDependencies` if you want `npmSkills.auto` to run during `bun install`:
+
+```json
+{
+  "trustedDependencies": ["npm-skills"]
+}
+```
+
+For Deno installs, dependency lifecycle scripts are also blocked by default. Use a local `node_modules` mode plus `--allow-scripts=npm:npm-skills` when adding `npm-skills` if you want `npmSkills.auto` to run automatically:
+
+```bash
+deno add --node-modules-dir=auto --allow-scripts=npm:npm-skills -D npm:npm-skills
+```
+
+If you prefer not to grant lifecycle-script permissions in Bun or Deno, run the same flow explicitly:
+
+```bash
+bunx npm-skills auto
+deno run -A npm:npm-skills auto
+```
 
 ## Skill Sharing Pattern
 
@@ -98,7 +134,7 @@ If your repo both authors its own skills and extracts skills from dependencies, 
 
 This is a recommended pattern, not the default. If you do nothing, extraction still defaults to `.agents/skills`.
 
-That keeps local skills easy to curate, keeps sync cleanup scoped to imported content, and keeps Git from collecting extracted folders like a very enthusiastic raccoon.
+That keeps local skills easy to curate and keeps sync cleanup scoped to imported content.
 
 Recommended layout:
 
@@ -302,6 +338,7 @@ If a package wants to disable skill export entirely:
 Consumer-side config and package-side config are separate:
 
 - consumer config decides where to read skills from for a given installed package
+- consumer config can also opt into development-time auto extraction with `npmSkills.auto`
 - package config decides where this package publishes skills from, and which skill folders can be published
 
 ## CLI
@@ -333,6 +370,16 @@ npx npm-skills extract --verbose
 
 In a monorepo, the default stays local to the package you run from, so `packages/app` extracts into `packages/app/.agents/skills`.
 
+### `auto`
+
+```bash
+npx npm-skills auto
+```
+
+Runs the same `npmSkills.auto` logic used by the package install hook once in the current project.
+
+Use this when your package manager does not automatically allow dependency lifecycle scripts, such as Bun without `trustedDependencies` or Deno without `--allow-scripts`.
+
 ### `new`
 
 ```bash
@@ -361,6 +408,7 @@ Recommended everyday commands:
 
 ```bash
 npm-skills extract
+npm-skills auto
 npm-skills extract --override
 npm-skills extract --only "@bluelibs/*"
 npm-skills new my-skill
@@ -373,7 +421,7 @@ This exists for integrations and tooling, but it is secondary to the CLI.
 Extract skills directly:
 
 ```ts
-import { extractSkills } from "npm-skills";
+import { extractSkills, runAutoExtract } from "npm-skills";
 
 const report = await extractSkills({
   cwd: process.cwd(),
@@ -386,6 +434,12 @@ const report = await extractSkills({
 
 console.log(report.extracted);
 console.log(report.skipped);
+
+const autoResult = await runAutoExtract({
+  cwd: process.cwd(),
+});
+
+console.log(autoResult.status);
 ```
 
 Create a local skill template:
@@ -424,20 +478,11 @@ interface ExtractReport {
       | "missing-source"
       | "package-opt-out";
   }>;
+  deletedSkills: number;
 }
 ```
 
-The package is built with `tsup` and ships:
-
-- CommonJS via `.cjs`
-- ESM via `.mjs`
-- Type declarations via `dist/types`
-
-If you are running under Deno today, prefer the CommonJS entry. This is an experimental path rather than part of the verified support matrix.
-
-```ts
-import { extractSkills } from "./node_modules/npm-skills/dist/index.cjs";
-```
+The package ships CommonJS (`.cjs`), ESM (`.mjs`), and type declarations under `dist/types`.
 
 ## Notes for Package Authors
 
@@ -459,6 +504,12 @@ Run it locally with:
 
 ```bash
 npm run qa
+```
+
+For manual cross-runtime smoke tests that exercise the Bun and Deno CLI, programmatic API, and install hook paths, run:
+
+```bash
+npm run test:denobun
 ```
 
 ## License
