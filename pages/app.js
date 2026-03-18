@@ -92,7 +92,7 @@ function sanitizeRenderedMarkdown(html) {
   ]);
   const allowedAttributes = {
     A: new Set(["href", "title"]),
-    IMG: new Set(["alt", "src", "title"]),
+    IMG: new Set(["alt", "height", "src", "title", "width"]),
     P: new Set(["align"]),
   };
 
@@ -148,11 +148,12 @@ function applyShellMetadata(config) {
   const repository = config.repository || "";
   const branch = config.branch || "main";
   const repoUrl = repository ? `https://github.com/${repository}` : "#readme";
+  const repoShortName = config.repo || repository.split("/").pop() || "npm-skills";
 
   document.title = repository
     ? `${repository} README Atelier`
-    : "README Atelier";
-  repoName.textContent = repository || "Local Pages preview";
+    : "npm-skills";
+  repoName.textContent = repository || repoShortName;
   branchLabel.textContent = `branch / ${branch}`;
   repoLink.href = repoUrl;
 
@@ -375,6 +376,17 @@ function decorateImages(container, config) {
 
   container.querySelectorAll("img[src]").forEach((image) => {
     const source = image.getAttribute("src");
+    const altText = image.getAttribute("alt")?.trim().toLowerCase() || "";
+
+    if (altText === "npm-skills logo") {
+      image.classList.add("is-readme-logo");
+      image.parentElement?.classList.add("logo-row");
+    }
+
+    if (source?.includes("img.shields.io/")) {
+      image.classList.add("is-badge");
+    }
+
     if (!source || isExternalUrl(source) || source.startsWith("data:")) {
       return;
     }
@@ -457,10 +469,10 @@ function updateStats(markdown, headings, container) {
 
 function updateHeroFromContent(config, container) {
   const firstHeading = container.querySelector("h1");
-  const firstParagraph = container.querySelector("p");
-  const repository = config.repository || "README";
+  const firstParagraph = container.querySelector("p:not([align='center'])");
+  const repository = config.repository || "npm-skills";
   const repoShortName =
-    config.repo || repository.split("/").pop() || repository;
+    config.repo || repository.split("/").pop() || "npm-skills";
 
   siteTitle.textContent =
     (firstHeading ? getElementLabel(firstHeading) : "") || repoShortName;

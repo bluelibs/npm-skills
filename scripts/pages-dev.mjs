@@ -11,12 +11,19 @@ import {
 } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { syncPagesReadme } from "./sync-pages-readme.mjs";
+import {
+  pagesReadmeAssetPaths,
+  syncPagesReadme,
+} from "./sync-pages-readme.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
 const pagesDir = resolve(repoRoot, "pages");
 const readmePath = resolve(repoRoot, "README.md");
+const readmeSyncSourcePaths = [
+  readmePath,
+  ...pagesReadmeAssetPaths.map((assetPath) => resolve(repoRoot, assetPath)),
+];
 const defaultPort = 3000;
 const devEventsPath = "/__dev/events";
 const contentTypes = {
@@ -50,9 +57,11 @@ server.on("error", (error) => {
   process.exit(1);
 });
 
-const readmeWatcher = watch(readmePath, { persistent: true }, () => {
-  scheduleReadmeSync();
-});
+const readmeSyncWatchers = readmeSyncSourcePaths.map((filePath) =>
+  watch(filePath, { persistent: true }, () => {
+    scheduleReadmeSync();
+  }),
+);
 
 const pagesWatcher = watch(pagesDir, { persistent: true }, (_eventType, file) => {
   const fileName = typeof file === "string" ? file : "";
@@ -73,7 +82,7 @@ await new Promise((resolveListen, rejectListen) => {
 });
 
 console.log(`Pages dev server ready at http://localhost:${defaultPort}`);
-console.log("Watching README.md and pages/ for changes.");
+console.log("Watching README.md, synced README assets, and pages/ for changes.");
 
 process.on("SIGINT", handleShutdown);
 process.on("SIGTERM", handleShutdown);
@@ -212,7 +221,9 @@ function handleShutdown(signal) {
 function closeDevLoop() {
   clearTimeout(pendingReadmeSyncTimer);
   clearTimeout(pendingPageReloadTimer);
-  readmeWatcher.close();
+  readmeSyncWatchers.forEach((watcher) => {
+    watcher.close();
+  });
   pagesWatcher.close();
 
   for (const client of devClients) {

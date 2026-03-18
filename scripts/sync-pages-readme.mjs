@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -6,6 +6,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
 const sourcePath = resolve(repoRoot, "README.md");
 const destinationPath = resolve(repoRoot, "pages", "README.md");
+export const pagesReadmeAssetPaths = ["assets/npm-skills-logo.png"];
 const variantStartMarker = "<!--readme-variant-links:start-->";
 const variantEndMarker = "<!--readme-variant-links:end-->";
 const pagesVariantLines = [
@@ -43,6 +44,7 @@ export function createPagesReadmeContent(sourceContent) {
 
 export async function syncPagesReadme() {
   await mkdir(dirname(destinationPath), { recursive: true });
+  await syncPagesReadmeAssets();
   const sourceContent = await readFile(sourcePath, "utf8");
   const nextPagesReadmeContent = createPagesReadmeContent(sourceContent);
   const existingDestinationContent = await readFile(destinationPath, "utf8").catch(
@@ -67,6 +69,18 @@ export async function syncPagesReadme() {
   await writeFile(destinationPath, pagesReadmeContent, "utf8");
 
   console.log(`Synced ${sourcePath} -> ${destinationPath}`);
+}
+
+export async function syncPagesReadmeAssets(destinationDir = resolve(repoRoot, "pages")) {
+  await mkdir(destinationDir, { recursive: true });
+
+  await Promise.all(
+    pagesReadmeAssetPaths.map(async (assetPath) => {
+      const destinationPath = resolve(destinationDir, assetPath);
+      await mkdir(dirname(destinationPath), { recursive: true });
+      await cp(resolve(repoRoot, assetPath), destinationPath);
+    }),
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

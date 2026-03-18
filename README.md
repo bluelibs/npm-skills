@@ -1,4 +1,6 @@
-<h1 align="center">npm-skills</h1>
+<p align="center">
+  <img src="./assets/npm-skills-logo.png" alt="npm-skills logo" width="420" />
+</p>
 <p align="center">
   <img src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" alt="Node 22+" />
   <img src="https://img.shields.io/badge/coverage-100%25-16a34a" alt="100% test coverage" />
@@ -64,10 +66,10 @@ Bun users can also run the packaged CLI directly:
 bunx npm-skills extract
 ```
 
-Deno users can run the packaged CommonJS CLI entry directly:
+Deno users can run the package directly through Deno's npm support:
 
 ```bash
-deno run -A ./node_modules/npm-skills/dist/bin.cjs extract --skip-production
+deno run -A npm:npm-skills@latest extract --skip-production
 ```
 
 Add a script:

@@ -1,7 +1,10 @@
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createPagesReadmeContent } from "./sync-pages-readme.mjs";
+import {
+  createPagesReadmeContent,
+  syncPagesReadmeAssets,
+} from "./sync-pages-readme.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, "..");
@@ -24,6 +27,7 @@ export async function buildPagesSite({
   await rm(outputDir, { force: true, recursive: true });
   await mkdir(outputDir, { recursive: true });
   await cp(pagesSourceDir, outputDir, { recursive: true });
+  await syncPagesReadmeAssets(outputDir);
   const readmeContent = await readFile(resolve(repoRoot, "README.md"), "utf8");
   await writeFile(
     resolve(outputDir, "README.md"),
