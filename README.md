@@ -2,8 +2,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" alt="Node 22+" />
   <img src="https://img.shields.io/badge/coverage-100%25-16a34a" alt="100% test coverage" />
-  <img src="https://img.shields.io/badge/bun-exp-f9f1e1?logo=bun&logoColor=111111" alt="Bun experimental" />
-  <img src="https://img.shields.io/badge/deno-exp-000000?logo=deno&logoColor=white" alt="Deno experimental" />
+  <img src="https://img.shields.io/badge/bun-stable-f9f1e1?logo=bun&logoColor=111111" alt="Bun supported" />
+  <img src="https://img.shields.io/badge/deno-stable-000000?logo=deno&logoColor=white" alt="Deno supported" />
   <br />
   <img src="https://img.shields.io/badge/linux-fcc624?logo=linux&logoColor=111111" alt="Linux" />
   <img src="https://img.shields.io/badge/macos-111111?logo=apple&logoColor=white" alt="macOS" />
@@ -38,8 +38,8 @@ It follows conventions people already recognize from the [`skills.sh` ecosystem]
 `npm-skills` officially targets Node `>=22`.
 
 - Node: officially supported for both the CLI and programmatic API
-- Bun: the CLI path is expected to work, including `--env`, but Bun is still experimental here
-- Deno: the env gate also falls back to `Deno.env.get("NODE_ENV")`, but the overall runtime path is still experimental and may need the usual file and env permissions
+- Bun: supported for CLI usage, including `--env`
+- Deno: supported for CLI usage through the CommonJS entry, including the `NODE_ENV` fallback via `Deno.env.get("NODE_ENV")`
 
 The CLI is the primary way this package is meant to be used. In most projects you will not need the programmatic API at all, which is nice because we all deserve at least one tool in life that does not begin with "first, write a wrapper."
 
@@ -54,20 +54,20 @@ npm install npm-skills
 Or use it directly:
 
 ```bash
-npx npm-skills extract
-npx npm-skills --help
+npm-skills extract
+npm-skills --help
 ```
 
-Bun users can skip the `n` and keep their startup time smug:
+Bun users can also run the packaged CLI directly:
 
 ```bash
 bunx npm-skills extract
 ```
 
-Deno users should treat the CLI path as experimental, but the env gate is designed to work there too:
+Deno users can run the packaged CommonJS CLI entry directly:
 
 ```bash
-deno run -A npm:npm-skills extract --env development
+deno run -A ./node_modules/npm-skills/dist/bin.cjs extract --env development
 ```
 
 Add a script:
@@ -99,6 +99,14 @@ If you want skills to stay automatically synced after installs, install `npm-ski
 That keeps the binary available in environments where `postinstall` runs, and `--env development` makes the command exit cleanly unless the current `NODE_ENV` is exactly `development`.
 
 If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
+
+Maintainers can verify the Bun and Deno CLI paths locally with:
+
+```bash
+npm run qa:local
+```
+
+That runs the normal QA flow plus runtime smoke tests for Bun and Deno. The smoke step skips automatically on CI.
 
 ## Skill Sharing Pattern
 
@@ -450,7 +458,7 @@ The package is built with `tsup` and ships:
 - ESM via `.mjs`
 - Type declarations via `dist/types`
 
-If you are running under Deno today, prefer the CommonJS entry. This is an experimental path rather than part of the verified support matrix.
+If you are running under Deno today, prefer the CommonJS entry.
 
 ```ts
 import { extractSkills } from "./node_modules/npm-skills/dist/index.cjs";

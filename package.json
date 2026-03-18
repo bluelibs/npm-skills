@@ -36,6 +36,7 @@
     "pages:build": "node ./scripts/build-pages-site.mjs",
     "pages:dev": "node ./scripts/pages-dev.mjs",
     "pages:sync": "node ./scripts/sync-pages-readme.mjs",
+    "runtime:smoke": "node ./scripts/runtime-smoke.mjs",
     "test": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --verbose=false",
     "test:serial": "node ./scripts/run-jest-watchdog.mjs -- --config config/jest/jest.config.js --verbose --runInBand",
     "test:dev": "jest --config config/jest/jest.config.js --verbose --watch",
@@ -46,6 +47,7 @@
     "lint": "eslint --config config/eslint/eslint.config.mjs ./src",
     "lint:fix": "eslint --config config/eslint/eslint.config.mjs ./src --fix",
     "qa": "npm run coverage:ai && npm run lint:fix && npm run typecheck && npm run build",
+    "qa:local": "npm run qa && npm run runtime:smoke",
     "prepublishOnly": "npm run clean && npm run qa"
   },
   "devDependencies": {
