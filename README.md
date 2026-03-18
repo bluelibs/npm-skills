@@ -47,7 +47,7 @@ The CLI is the primary way this package is meant to be used. In most projects yo
 
 ## Quick Start
 
-Install it:
+Install it in your project:
 
 ```bash
 npm install npm-skills
@@ -93,7 +93,7 @@ If you want skills to stay automatically synced after installs, install `npm-ski
 ```json
 {
   "scripts": {
-    "postinstall": "npx npm-skills extract --env development --override"
+    "postinstall": "npm-skills extract --env development --override"
   }
 }
 ```
@@ -101,18 +101,6 @@ If you want skills to stay automatically synced after installs, install `npm-ski
 That keeps the binary available in environments where `postinstall` runs, and `--env development` makes the command exit cleanly unless the current `NODE_ENV` is exactly `development`.
 
 If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
-
-If you specifically want a named script for development-only extraction, use the built-in env gate directly:
-
-```json
-{
-  "scripts": {
-    "skills:extract": "npx npm-skills extract --env development --override"
-  }
-}
-```
-
-That keeps the check inside `npm-skills` instead of shell glue, so the behavior stays aligned across `npm`, `bunx`, and Deno's `npm:` bridge.
 
 ## Skill Sharing Pattern
 
@@ -145,7 +133,6 @@ Quick setup:
 Make sure `.agents/skills/extracted` exists, then run:
 
 ```bash
-printf "*\n" > .agents/skills/extracted/.gitignore
 npx npm-skills extract --output .agents/skills/extracted
 ```
 
@@ -331,7 +318,7 @@ Consumer-side config and package-side config are separate:
 ### `extract`
 
 ```bash
-npx npm-skills extract [package-a package-b ...] [options]
+npm-skills extract [package-a package-b ...] [options]
 ```
 
 Options:
@@ -347,13 +334,13 @@ Options:
 Examples:
 
 ```bash
-npx npm-skills extract
-npx npm-skills extract @bluelibs/runner my-package
-npx npm-skills extract --only "@bluelibs/*" --output .agents/skills
-npx npm-skills extract --env development
-npx npm-skills extract --devDependencies=false
-npx npm-skills extract --override
-npx npm-skills extract --verbose
+npm-skills extract
+npm-skills extract @bluelibs/runner my-package
+npm-skills extract --only "@bluelibs/*" --output .agents/skills
+npm-skills extract --env development
+npm-skills extract --devDependencies=false
+npm-skills extract --override
+npm-skills extract --verbose
 ```
 
 `--env` controls whether extraction runs at all for the current `NODE_ENV`. `--devDependencies` controls whether `devDependencies` are included in the package scan. The old `--dev` flag is still accepted as an alias for compatibility, but `--devDependencies` is the clearer name going forward.
@@ -363,7 +350,7 @@ In a monorepo, the default stays local to the package you run from, so `packages
 ### `new`
 
 ```bash
-npx npm-skills new <skill-name> [options]
+npm-skills new <skill-name> [options]
 ```
 
 Options:
@@ -380,8 +367,8 @@ What it creates:
 Examples:
 
 ```bash
-npx npm-skills new my-skill
-npx npm-skills new release-notes --folder ./
+npm-skills new my-skill
+npm-skills new release-notes --folder ./
 ```
 
 Recommended everyday commands:
