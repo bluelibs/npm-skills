@@ -82,17 +82,19 @@ Then run:
 npm run skills:extract
 ```
 
-If you want skills to stay automatically synced after installs, wire it into `postinstall`:
+If you want skills to stay automatically synced after installs, wire it into `prepare`:
 
 ```json
 {
   "scripts": {
-    "postinstall": "npm-skills extract --override"
+    "prepare": "npm-skills extract --override"
   }
 }
 ```
 
-If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
+`prepare` runs after every `npm install` in development but is skipped in production installs (`--omit=dev`), so the script won't fail when `npm-skills` is a devDependency and the binary is absent. Avoid `postinstall` for this reason.
+
+If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `prepare`.
 
 ## Skill Sharing Pattern
 
