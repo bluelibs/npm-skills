@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/AGENTS.md-compatible-2563eb" alt="AGENTS.md compatible" />
 </p>
 
-`npm-skills` gives npm packages a simple, standard way to ship AI skills as part of the dependencies teams already install.
+`npm-skills` helps npm packages ship AI skills in a way that's easy to version, distribute, and extract. Put `SKILL.md`-based skills in a package, then copy them into your workspace with one command.
 
 <!--readme-variant-links:start-->
 
@@ -20,9 +20,7 @@
 
 <!--readme-variant-links:end-->
 
-If a package exposes a `skills/` folder containing one or more skill directories with a `SKILL.md`, this tool can extract them into your local `.agents/skills` folder with one command, keeping the output in the current project even when you run it from `packages/*` and fitting neatly into AGENTS.md-style repos.
-
-That means package authors get a predictable convention, and consumers get a clean DX instead of custom copy scripts, mystery folders, and ritual sacrifice to the filesystem gods.
+It gives package authors a predictable convention and gives consuming teams a clean way to keep skills alongside the projects that use them. Skills travel with your dependencies, stay compatible with `AGENTS.md` and `SKILL.md` workflows, land locally in `.agents/skills`, and stay fully customizable when your team needs different source paths, output paths, filters, or package mappings.
 
 ## Overview
 
