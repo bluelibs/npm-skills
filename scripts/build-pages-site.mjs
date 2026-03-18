@@ -8,7 +8,7 @@ const repoRoot = resolve(scriptDir, "..");
 const pagesSourceDir = resolve(repoRoot, "pages");
 
 export async function buildPagesSite({
-  outputDir = resolve(repoRoot, "_site"),
+  outputDir = resolve(repoRoot, "dist", "pages"),
   repository = process.env.GITHUB_REPOSITORY || "",
   branch = process.env.GITHUB_REF_NAME || "main",
 } = {}) {
@@ -67,6 +67,9 @@ function parseBuildPagesArgs(argv) {
   return options;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   await buildPagesSite(parseBuildPagesArgs(process.argv.slice(2)));
 }

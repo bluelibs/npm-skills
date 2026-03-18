@@ -32,6 +32,18 @@ interface ExtractManifest {
   packages: Record<string, string[]>;
 }
 
+function readEnvironmentVariable(name: string): string | undefined {
+  const processValue = Reflect.get(process.env, name);
+  if (typeof processValue === "string") return processValue;
+
+  const denoEnv = Reflect.get(Reflect.get(globalThis, "Deno") ?? {}, "env");
+  const get = Reflect.get(denoEnv ?? {}, "get");
+  if (typeof get !== "function") return undefined;
+
+  const value = Reflect.apply(get, denoEnv, [name]);
+  return typeof value === "string" ? value : undefined;
+}
+
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
     await fs.access(targetPath);
@@ -236,6 +248,7 @@ export async function extractSkills(
   options: ExtractOptions = {},
 ): Promise<ExtractReport> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
+  const requiredEnvironment = options.env?.trim();
   const includeDevDependencies = options.includeDevDependencies ?? true;
   const override = options.override ?? false;
   const verbose = options.verbose ?? false;
@@ -262,6 +275,24 @@ export async function extractSkills(
     skipped: [],
     deletedSkills: 0,
   };
+
+  if (requiredEnvironment) {
+    const currentEnvironment = readEnvironmentVariable("NODE_ENV");
+    if (currentEnvironment !== requiredEnvironment) {
+      logger.info(
+        `Skipped extraction because NODE_ENV is ${currentEnvironment ?? "undefined"}, expected ${requiredEnvironment}.`,
+      );
+      return {
+        ...report,
+        scannedPackages: [],
+        skippedEnvironment: {
+          expected: requiredEnvironment,
+          received: currentEnvironment,
+        },
+      };
+    }
+  }
+
   const previousManifest = pruneStaleSkills
     ? await readExtractManifest(outputDir)
     : createEmptyManifest();

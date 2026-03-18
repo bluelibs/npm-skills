@@ -32,7 +32,9 @@ Options:
   extract:
     --output <dir>     Destination directory. Overrides npmSkills.consume.output or .agents/skills
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
-    --dev <true|false> Include devDependencies. Defaults to true
+    --env <name>       Only run when NODE_ENV matches exactly
+    --devDependencies <true|false> Include devDependencies. Defaults to true
+    --dev <true|false> Deprecated alias for --devDependencies
     --override         Replace existing extracted skills without prompting
     --verbose          Show normal skip diagnostics such as missing skills folders
 
@@ -96,7 +98,18 @@ function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
       continue;
     }
 
-    if (arg === "--dev") {
+    if (arg === "--env") {
+      options.env = getRequiredOptionValue(rest, index, "--env");
+      index++;
+      continue;
+    }
+
+    if (arg.startsWith("--env=")) {
+      options.env = arg.slice("--env=".length);
+      continue;
+    }
+
+    if (arg === "--devDependencies" || arg === "--dev") {
       const nextArg = rest[index + 1];
       if (!nextArg || nextArg.startsWith("--")) {
         options.includeDevDependencies = true;
@@ -107,8 +120,11 @@ function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
       continue;
     }
 
-    if (arg.startsWith("--dev=")) {
-      options.includeDevDependencies = parseBoolean(arg.slice("--dev=".length));
+    if (arg.startsWith("--devDependencies=") || arg.startsWith("--dev=")) {
+      const value = arg.startsWith("--devDependencies=")
+        ? arg.slice("--devDependencies=".length)
+        : arg.slice("--dev=".length);
+      options.includeDevDependencies = parseBoolean(value);
       continue;
     }
 
@@ -253,6 +269,15 @@ export async function runCli(
         },
         prompt: parsed.options.override ? undefined : dependencies.prompt,
       });
+
+      if (report.skippedEnvironment) {
+        const currentEnvironment =
+          report.skippedEnvironment.received ?? "undefined";
+        dependencies.stdout.log(
+          `Skipped extraction because NODE_ENV is ${currentEnvironment}, expected ${report.skippedEnvironment.expected}.`,
+        );
+        return 0;
+      }
 
       dependencies.stdout.log(
         formatExtractSummary(

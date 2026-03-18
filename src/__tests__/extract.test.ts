@@ -205,6 +205,240 @@ describe("extractSkills", () => {
     ).resolves.toBe("# Basic\n");
   });
 
+  it("skips extraction when NODE_ENV does not match the required env", async () => {
+    const cwd = await createTempProject();
+    const previousNodeEnv = process.env.NODE_ENV;
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    process.env.NODE_ENV = "production";
+    const { logger, messages } = createLogger();
+
+    try {
+      const report = await extractSkills({
+        cwd,
+        env: "development",
+        logger,
+      });
+
+      expect(report.scannedPackages).toEqual([]);
+      expect(report.extracted).toEqual([]);
+      expect(report.skipped).toEqual([]);
+      expect(report.deletedSkills).toBe(0);
+      expect(report.skippedEnvironment).toEqual({
+        expected: "development",
+        received: "production",
+      });
+      await expect(
+        fs.access(path.join(cwd, ".agents/skills")),
+      ).rejects.toThrow();
+      expect(messages.info).toEqual([
+        "Skipped extraction because NODE_ENV is production, expected development.",
+      ]);
+      expect(messages.warn).toEqual([]);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+    }
+  });
+
+  it("reports undefined when env-gated extraction has no NODE_ENV", async () => {
+    const cwd = await createTempProject();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousDeno = Reflect.get(globalThis, "Deno");
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    delete process.env.NODE_ENV;
+    if (previousDeno === undefined) {
+      Reflect.deleteProperty(globalThis, "Deno");
+    } else {
+      Reflect.set(globalThis, "Deno", undefined);
+    }
+    const { logger, messages } = createLogger();
+
+    try {
+      const report = await extractSkills({
+        cwd,
+        env: "development",
+        logger,
+      });
+
+      expect(report.skippedEnvironment).toEqual({
+        expected: "development",
+      });
+      expect(messages.info).toEqual([
+        "Skipped extraction because NODE_ENV is undefined, expected development.",
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+
+      if (previousDeno === undefined) {
+        Reflect.deleteProperty(globalThis, "Deno");
+      } else {
+        Reflect.set(globalThis, "Deno", previousDeno);
+      }
+    }
+  });
+
+  it("falls back to Deno.env.get for env-gated extraction", async () => {
+    const cwd = await createTempProject();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousDeno = Reflect.get(globalThis, "Deno");
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    delete process.env.NODE_ENV;
+    Reflect.set(globalThis, "Deno", {
+      env: {
+        get(name: string) {
+          return name === "NODE_ENV" ? "development" : undefined;
+        },
+      },
+    });
+
+    try {
+      const report = await extractSkills({
+        cwd,
+        env: "development",
+        override: true,
+      });
+
+      expect(report.skippedEnvironment).toBeUndefined();
+      expect(report.extracted.map((entry) => entry.destinationName)).toEqual([
+        "default-package-basic",
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+
+      if (previousDeno === undefined) {
+        Reflect.deleteProperty(globalThis, "Deno");
+      } else {
+        Reflect.set(globalThis, "Deno", previousDeno);
+      }
+    }
+  });
+
+  it("ignores non-string Deno env values for env-gated extraction", async () => {
+    const cwd = await createTempProject();
+    const previousNodeEnv = process.env.NODE_ENV;
+    const previousDeno = Reflect.get(globalThis, "Deno");
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    delete process.env.NODE_ENV;
+    Reflect.set(globalThis, "Deno", {
+      env: {
+        get() {
+          return 123;
+        },
+      },
+    });
+    const { logger, messages } = createLogger();
+
+    try {
+      const report = await extractSkills({
+        cwd,
+        env: "development",
+        logger,
+      });
+
+      expect(report.skippedEnvironment).toEqual({
+        expected: "development",
+      });
+      expect(messages.info).toEqual([
+        "Skipped extraction because NODE_ENV is undefined, expected development.",
+      ]);
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = previousNodeEnv;
+      }
+
+      if (previousDeno === undefined) {
+        Reflect.deleteProperty(globalThis, "Deno");
+      } else {
+        Reflect.set(globalThis, "Deno", previousDeno);
+      }
+    }
+  });
+
   it("lets explicit outputDir override npmSkills.consume.output", async () => {
     const cwd = await createTempProject();
 

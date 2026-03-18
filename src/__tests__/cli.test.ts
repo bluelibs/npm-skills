@@ -61,7 +61,8 @@ describe("cli", () => {
         "@bluelibs/runner",
         "--output=.agents/skills",
         "--only=@bluelibs/*,left-pad",
-        "--dev=false",
+        "--env=development",
+        "--devDependencies=false",
         "--override",
         "--verbose",
       ]),
@@ -71,23 +72,31 @@ describe("cli", () => {
         packageNames: ["@bluelibs/runner"],
         outputDir: ".agents/skills",
         only: ["@bluelibs/*", "left-pad"],
+        env: "development",
         includeDevDependencies: false,
         override: true,
         verbose: true,
       },
     });
 
-    expect(parseCliArgs(["extract", "--dev"])).toEqual({
+    expect(parseCliArgs(["extract", "--devDependencies"])).toEqual({
       command: "extract",
       options: {
         includeDevDependencies: true,
       },
     });
 
-    expect(parseCliArgs(["extract", "--dev=true"])).toEqual({
+    expect(parseCliArgs(["extract", "--devDependencies=true"])).toEqual({
       command: "extract",
       options: {
         includeDevDependencies: true,
+      },
+    });
+
+    expect(parseCliArgs(["extract", "--devDependencies", "false"])).toEqual({
+      command: "extract",
+      options: {
+        includeDevDependencies: false,
       },
     });
 
@@ -95,6 +104,13 @@ describe("cli", () => {
       command: "extract",
       options: {
         includeDevDependencies: false,
+      },
+    });
+
+    expect(parseCliArgs(["extract", "--dev=true"])).toEqual({
+      command: "extract",
+      options: {
+        includeDevDependencies: true,
       },
     });
 
@@ -142,7 +158,10 @@ describe("cli", () => {
     expect(() => parseCliArgs(["extract", "--only", "--override"])).toThrow(
       "Missing value for --only",
     );
-    expect(() => parseCliArgs(["extract", "--dev=maybe"])).toThrow(
+    expect(() => parseCliArgs(["extract", "--env"])).toThrow(
+      "Missing value for --env",
+    );
+    expect(() => parseCliArgs(["extract", "--devDependencies=maybe"])).toThrow(
       "Invalid boolean value: maybe",
     );
     expect(() => parseCliArgs(["new"])).toThrow("Missing skill name for new");
@@ -357,6 +376,51 @@ describe("cli", () => {
 
     expect(dependencies.stdout.log).toHaveBeenCalledWith(
       "\u2713 Imported 0 skills from 1 total packages.",
+    );
+  });
+
+  it("prints a dedicated message when extraction is skipped by env", async () => {
+    extractSkills.mockResolvedValue({
+      outputDir: "/tmp/skills",
+      scannedPackages: [],
+      extracted: [],
+      skipped: [],
+      deletedSkills: 0,
+      skippedEnvironment: {
+        expected: "development",
+        received: "production",
+      },
+    });
+
+    const dependencies = createDependencies();
+    await expect(
+      runCli(["extract", "--env", "development"], dependencies),
+    ).resolves.toBe(0);
+
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(
+      "Skipped extraction because NODE_ENV is production, expected development.",
+    );
+  });
+
+  it("uses undefined in the env skip message when NODE_ENV is absent", async () => {
+    extractSkills.mockResolvedValue({
+      outputDir: "/tmp/skills",
+      scannedPackages: [],
+      extracted: [],
+      skipped: [],
+      deletedSkills: 0,
+      skippedEnvironment: {
+        expected: "development",
+      },
+    });
+
+    const dependencies = createDependencies();
+    await expect(
+      runCli(["extract", "--env", "development"], dependencies),
+    ).resolves.toBe(0);
+
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(
+      "Skipped extraction because NODE_ENV is undefined, expected development.",
     );
   });
 });

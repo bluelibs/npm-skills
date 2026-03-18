@@ -40,8 +40,8 @@ It follows conventions people already recognize from the [`skills.sh` ecosystem]
 `npm-skills` officially targets Node `>=22`.
 
 - Node: officially supported for both the CLI and programmatic API
-- Bun: the published artifacts may work, but Bun is not officially tested yet
-- Deno: the published artifacts may work with the usual file and system permissions, but Deno is not officially tested yet
+- Bun: the CLI path is expected to work, including `--env`, but Bun is still experimental here
+- Deno: the env gate also falls back to `Deno.env.get("NODE_ENV")`, but the overall runtime path is still experimental and may need the usual file and env permissions
 
 The CLI is the primary way this package is meant to be used. In most projects you will not need the programmatic API at all, which is nice because we all deserve at least one tool in life that does not begin with "first, write a wrapper."
 
@@ -50,7 +50,7 @@ The CLI is the primary way this package is meant to be used. In most projects yo
 Install it:
 
 ```bash
-npm install -D npm-skills
+npm install npm-skills
 ```
 
 Or use it directly:
@@ -64,6 +64,12 @@ Bun users can skip the `n` and keep their startup time smug:
 
 ```bash
 bunx npm-skills extract
+```
+
+Deno users should treat the CLI path as experimental, but the env gate is designed to work there too:
+
+```bash
+deno run -A npm:npm-skills extract --env development
 ```
 
 Add a script:
@@ -82,19 +88,31 @@ Then run:
 npm run skills:extract
 ```
 
-If you want skills to stay automatically synced after installs, wire it into `prepare`:
+If you want skills to stay automatically synced after installs, install `npm-skills` as a regular dependency and wire it into `postinstall`:
 
 ```json
 {
   "scripts": {
-    "prepare": "npm-skills extract --override"
+    "postinstall": "npx npm-skills extract --env development --override"
   }
 }
 ```
 
-`prepare` runs after every `npm install` in development but is skipped in production installs (`--omit=dev`), so the script won't fail when `npm-skills` is a devDependency and the binary is absent. Avoid `postinstall` for this reason.
+That keeps the binary available in environments where `postinstall` runs, and `--env development` makes the command exit cleanly unless the current `NODE_ENV` is exactly `development`.
 
-If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `prepare`.
+If you prefer to avoid automatic overwrites, keep extraction as an explicit script instead of `postinstall`.
+
+If you specifically want a named script for development-only extraction, use the built-in env gate directly:
+
+```json
+{
+  "scripts": {
+    "skills:extract": "npx npm-skills extract --env development --override"
+  }
+}
+```
+
+That keeps the check inside `npm-skills` instead of shell glue, so the behavior stays aligned across `npm`, `bunx`, and Deno's `npm:` bridge.
 
 ## Skill Sharing Pattern
 
@@ -201,7 +219,7 @@ By default, `npm-skills` scans:
 - `peerDependencies`
 - `devDependencies`
 
-Pass `--dev=false` or `includeDevDependencies: false` to exclude dev dependencies.
+Pass `--devDependencies=false` or `includeDevDependencies: false` to exclude dev dependencies.
 
 Generated local skills include a `LICENSE.txt`.
 
@@ -320,7 +338,9 @@ Options:
 
 - `--output <dir>`: destination folder, overrides `npmSkills.consume.output` or defaults to `.agents/skills`
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
-- `--dev <true|false>`: include dev dependencies, defaults to `true`
+- `--env <name>`: only run when `NODE_ENV` matches exactly
+- `--devDependencies <true|false>`: include dev dependencies in the package scan, defaults to `true`
+- `--dev <true|false>`: deprecated alias for `--devDependencies`
 - `--override`: replace existing extracted skills without prompting
 - `--verbose`: show normal skip diagnostics such as packages without a `skills/` folder
 
@@ -330,10 +350,13 @@ Examples:
 npx npm-skills extract
 npx npm-skills extract @bluelibs/runner my-package
 npx npm-skills extract --only "@bluelibs/*" --output .agents/skills
-npx npm-skills extract --dev=false
+npx npm-skills extract --env development
+npx npm-skills extract --devDependencies=false
 npx npm-skills extract --override
 npx npm-skills extract --verbose
 ```
+
+`--env` controls whether extraction runs at all for the current `NODE_ENV`. `--devDependencies` controls whether `devDependencies` are included in the package scan. The old `--dev` flag is still accepted as an alias for compatibility, but `--devDependencies` is the clearer name going forward.
 
 In a monorepo, the default stays local to the package you run from, so `packages/app` extracts into `packages/app/.agents/skills`.
 
@@ -383,6 +406,7 @@ const report = await extractSkills({
   cwd: process.cwd(),
   outputDir: ".agents/skills",
   only: ["@bluelibs/*"],
+  env: "development",
   includeDevDependencies: true,
   override: false,
   verbose: false,
@@ -428,6 +452,10 @@ interface ExtractReport {
       | "missing-source"
       | "package-opt-out";
   }>;
+  skippedEnvironment?: {
+    expected: string;
+    received?: string;
+  };
 }
 ```
 
