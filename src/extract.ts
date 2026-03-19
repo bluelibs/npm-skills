@@ -147,6 +147,26 @@ async function findSkillDirectories(rootDir: string): Promise<string[]> {
   return skillDirectories;
 }
 
+function staysWithinRoot(rootDir: string, targetDir: string): boolean {
+  const relativePath = path.relative(rootDir, targetDir);
+  return (
+    relativePath === "" ||
+    (!relativePath.startsWith("..") && !path.isAbsolute(relativePath))
+  );
+}
+
+function resolvePublishedSourceRoot(
+  packageRoot: string,
+  configuredSource: string,
+): { escapesPackageRoot: boolean; sourceRoot: string } {
+  const sourceRoot = path.resolve(packageRoot, configuredSource);
+
+  return {
+    escapesPackageRoot: !staysWithinRoot(packageRoot, sourceRoot),
+    sourceRoot,
+  };
+}
+
 function getSkillExportName(
   sourceRoot: string,
   skillDirectory: string,
@@ -190,6 +210,25 @@ function createPackageResolver(cwd: string): (packageName: string) => string {
   const packageJsonPath = path.join(cwd, "package.json");
   const requireFromProject = createRequire(packageJsonPath);
   return (specifier: string) => requireFromProject.resolve(specifier);
+}
+
+function resolveOutputDirWithinProject(
+  cwd: string,
+  configuredOutputDir: string,
+): string {
+  const outputDir = path.resolve(cwd, configuredOutputDir);
+  const relativeOutputDir = path.relative(cwd, outputDir);
+
+  if (
+    relativeOutputDir === "" ||
+    (!relativeOutputDir.startsWith("..") && !path.isAbsolute(relativeOutputDir))
+  ) {
+    return outputDir;
+  }
+
+  throw new Error(
+    `Output directory must stay within the project directory: ${configuredOutputDir}`,
+  );
 }
 
 function shouldPruneStaleSkills(options: ExtractOptions): boolean {
@@ -257,7 +296,7 @@ export async function extractSkills(
 
   const projectPackageJson = await readProjectPackageJson(cwd);
   const projectConfig = resolveNpmSkillsConfig(projectPackageJson);
-  const outputDir = path.resolve(
+  const outputDir = resolveOutputDirWithinProject(
     cwd,
     options.outputDir ?? projectConfig.consume.output,
   );
@@ -345,22 +384,44 @@ export async function extractSkills(
       continue;
     }
 
-    const sourceRoot = path.join(
-      packageRoot,
-      projectConfig.consume.map[packageName] ?? packageExports.source,
-    );
+    const mappedSource = projectConfig.consume.map[packageName];
+    const configuredSource = mappedSource ?? packageExports.source;
+    const resolvedSource =
+      mappedSource === undefined
+        ? resolvePublishedSourceRoot(packageRoot, configuredSource)
+        : {
+            escapesPackageRoot: false,
+            sourceRoot: path.join(packageRoot, mappedSource),
+          };
 
-    const skillDirectories = await findSkillDirectories(sourceRoot);
+    if (resolvedSource.escapesPackageRoot) {
+      report.skipped.push({
+        packageName,
+        sourceDir: resolvedSource.sourceRoot,
+        destinationDir: outputDir,
+        reason: "invalid-source",
+      });
+      logger.warn(
+        `Skipped ${packageName} because npmSkills.publish.source must stay within the package root.`,
+      );
+      continue;
+    }
+
+    const skillDirectories = await findSkillDirectories(
+      resolvedSource.sourceRoot,
+    );
 
     if (skillDirectories.length === 0) {
       report.skipped.push({
         packageName,
-        sourceDir: sourceRoot,
+        sourceDir: resolvedSource.sourceRoot,
         destinationDir: outputDir,
         reason: "missing-source",
       });
       if (verbose) {
-        logger.warn(`No skills found for ${packageName} at ${sourceRoot}`);
+        logger.warn(
+          `No skills found for ${packageName} at ${resolvedSource.sourceRoot}`,
+        );
       }
       continue;
     }
@@ -369,13 +430,16 @@ export async function extractSkills(
       if (
         packageExports.exports.length > 0 &&
         !packageExports.exports.includes(
-          getSkillExportName(sourceRoot, skillDirectory),
+          getSkillExportName(resolvedSource.sourceRoot, skillDirectory),
         )
       ) {
         continue;
       }
 
-      const relativeSkillDir = path.relative(sourceRoot, skillDirectory);
+      const relativeSkillDir = path.relative(
+        resolvedSource.sourceRoot,
+        skillDirectory,
+      );
       const destinationName = buildDestinationName(
         packageName,
         relativeSkillDir,

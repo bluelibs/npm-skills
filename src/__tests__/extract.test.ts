@@ -205,6 +205,40 @@ describe("extractSkills", () => {
     ).resolves.toBe("# Basic\n");
   });
 
+  it("rejects npmSkills.consume.output values that escape the project directory", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+      npmSkills: {
+        consume: {
+          output: "../outside-skills",
+        },
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    await expect(extractSkills({ cwd })).rejects.toThrow(
+      "Output directory must stay within the project directory: ../outside-skills",
+    );
+    await expect(
+      fs.access(path.join(cwd, "..", "outside-skills")),
+    ).rejects.toThrow();
+  });
+
   it("skips extraction when skipProduction is enabled and NODE_ENV is production", async () => {
     const cwd = await createTempProject();
     const previousNodeEnv = process.env.NODE_ENV;
@@ -488,6 +522,39 @@ describe("extractSkills", () => {
         path.join(cwd, ".agents/skills/extracted/default-package-basic"),
       ),
     ).rejects.toThrow();
+  });
+
+  it("rejects explicit outputDir values that escape the project directory", async () => {
+    const cwd = await createTempProject();
+    const outsideDir = path.join(path.dirname(cwd), "outside-skills");
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    await expect(
+      extractSkills({
+        cwd,
+        outputDir: outsideDir,
+      }),
+    ).rejects.toThrow(
+      `Output directory must stay within the project directory: ${outsideDir}`,
+    );
+    await expect(fs.access(outsideDir)).rejects.toThrow();
   });
 
   it("skips missing installed packages instead of aborting the whole run", async () => {
@@ -1084,6 +1151,108 @@ describe("extractSkills", () => {
           cwd,
           ".agents/skills/package-policy-internal--hidden/SKILL.md",
         ),
+        "utf8",
+      ),
+    ).rejects.toThrow();
+  });
+
+  it("skips package publish sources that traverse outside the package root", async () => {
+    const cwd = await createTempProject();
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "escaped-source": "1.0.0",
+      },
+    });
+
+    await writeJson(
+      path.join(cwd, "node_modules/escaped-source/package.json"),
+      {
+        name: "escaped-source",
+        version: "1.0.0",
+        npmSkills: {
+          publish: {
+            source: "../../secret-area",
+          },
+        },
+      },
+    );
+    await writeFile(path.join(cwd, "secret-area/loot/SKILL.md"), "# Secret\n");
+
+    const { logger, messages } = createLogger();
+    const report = await extractSkills({
+      cwd,
+      logger,
+      override: true,
+    });
+
+    expect(report.extracted).toEqual([]);
+    expect(report.skipped).toHaveLength(1);
+    expect(report.skipped[0]).toMatchObject({
+      packageName: "escaped-source",
+      reason: "invalid-source",
+    });
+    expect(endsWithPath(report.skipped[0]?.sourceDir, "secret-area")).toBe(
+      true,
+    );
+    expect(await fs.realpath(report.skipped[0]?.destinationDir ?? "")).toBe(
+      await fs.realpath(path.join(cwd, ".agents/skills")),
+    );
+    await expect(
+      fs.readFile(
+        path.join(cwd, ".agents/skills/escaped-source-loot/SKILL.md"),
+        "utf8",
+      ),
+    ).rejects.toThrow();
+    expect(messages.warn).toEqual([
+      "Skipped escaped-source because npmSkills.publish.source must stay within the package root.",
+    ]);
+  });
+
+  it("skips package publish sources that use absolute paths", async () => {
+    const cwd = await createTempProject();
+    const absoluteSourceDir = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "absolute-source": "1.0.0",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/absolute-source/package.json"),
+      {
+        name: "absolute-source",
+        version: "1.0.0",
+        npmSkills: {
+          publish: {
+            source: absoluteSourceDir,
+          },
+        },
+      },
+    );
+    await writeFile(
+      path.join(absoluteSourceDir, "outside/SKILL.md"),
+      "# Outside\n",
+    );
+
+    const report = await extractSkills({
+      cwd,
+      override: true,
+    });
+
+    expect(report.extracted).toEqual([]);
+    expect(report.skipped).toEqual([
+      {
+        packageName: "absolute-source",
+        sourceDir: absoluteSourceDir,
+        destinationDir: path.join(cwd, ".agents/skills"),
+        reason: "invalid-source",
+      },
+    ]);
+    await expect(
+      fs.readFile(
+        path.join(cwd, ".agents/skills/absolute-source-outside/SKILL.md"),
         "utf8",
       ),
     ).rejects.toThrow();

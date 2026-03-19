@@ -91,6 +91,7 @@ export interface SkippedSkill {
   destinationDir: string;
   reason:
     | "declined"
+    | "invalid-source"
     | "missing-package"
     | "non-interactive"
     | "missing-source"
