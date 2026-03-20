@@ -12,6 +12,14 @@ async function writeJson(filePath: string, value: unknown): Promise<void> {
   await fs.writeFile(filePath, JSON.stringify(value, null, 2));
 }
 
+function expectedLinkTarget(
+  sourcePath: string,
+  destinationPath: string,
+): string {
+  if (process.platform === "win32") return sourcePath;
+  return path.relative(path.dirname(destinationPath), sourcePath);
+}
+
 describe("refs", () => {
   it("reads publish refs from the default policy file", async () => {
     const cwd = await createTempProject();
@@ -141,7 +149,9 @@ describe("refs", () => {
       ],
     });
     expect((await fs.lstat(destinationDir)).isSymbolicLink()).toBe(true);
-    await expect(fs.readlink(destinationDir)).resolves.toBe("../../../readmes");
+    await expect(fs.readlink(destinationDir)).resolves.toBe(
+      expectedLinkTarget(sourceDir, destinationDir),
+    );
   });
 
   it("fails fast when a ref source escapes the project directory", async () => {
@@ -302,7 +312,7 @@ describe("refs", () => {
 
     expect((await fs.lstat(destinationFile)).isSymbolicLink()).toBe(true);
     await expect(fs.readlink(destinationFile)).resolves.toBe(
-      "../../../docs/guide.md",
+      expectedLinkTarget(sourceFile, destinationFile),
     );
     expect(logSpy).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
