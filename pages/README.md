@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/npm-skills-logo.png" alt="npm-skills logo" width="420" />
+  <img src="https://raw.githubusercontent.com/bluelibs/npm-skills/main/assets/npm-skills-logo.png" alt="npm-skills logo" width="420" />
 </p>
 <p align="center">
   <img src="https://img.shields.io/badge/node-22%2B-339933?logo=node.js&logoColor=white" alt="Node 22+" />
