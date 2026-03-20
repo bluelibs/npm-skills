@@ -27,6 +27,11 @@ export interface ParsedRefsCliArgs {
   options: SyncRefsOptions;
 }
 
+interface ParsedGlobalCliOptions {
+  cwd?: string;
+  rest: string[];
+}
+
 export type ParsedCliArgs =
   | ParsedExtractCliArgs
   | ParsedNewCliArgs
@@ -35,11 +40,14 @@ export type ParsedCliArgs =
 const HELP_TEXT = `npm-skills
 
 Usage:
-  npm-skills extract [package-a package-b ...] [options]
-  npm-skills new <skill-name> [options]
-  npm-skills refs <materialize|restore>
+  npm-skills [--cwd <dir>] extract [package-a package-b ...] [options]
+  npm-skills [--cwd <dir>] new <skill-name> [options]
+  npm-skills [--cwd <dir>] refs <materialize|restore>
 
 Options:
+  global:
+    --cwd <dir>        Project root to operate from. Defaults to the current working directory
+
   extract:
     --output <dir>     Destination directory. Overrides npmSkills.consume.output or .agents/skills
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
@@ -80,6 +88,30 @@ function getRequiredOptionValue(
 
 export function getHelpText(): string {
   return HELP_TEXT;
+}
+
+function parseGlobalOptions(argv: string[]): ParsedGlobalCliOptions {
+  const rest: string[] = [];
+  let cwd: string | undefined;
+
+  for (let index = 0; index < argv.length; index++) {
+    const arg = argv[index];
+
+    if (arg === "--cwd") {
+      cwd = getRequiredOptionValue(argv, index, "--cwd");
+      index++;
+      continue;
+    }
+
+    if (arg.startsWith("--cwd=")) {
+      cwd = arg.slice("--cwd=".length);
+      continue;
+    }
+
+    rest.push(arg);
+  }
+
+  return { cwd, rest };
 }
 
 function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
@@ -221,12 +253,40 @@ function parseRefsArgs(rest: string[]): ParsedRefsCliArgs {
 }
 
 export function parseCliArgs(argv: string[]): ParsedCliArgs {
-  const [command, ...rest] = argv;
+  const { cwd, rest: commandArgs } = parseGlobalOptions(argv);
+  const [command, ...rest] = commandArgs;
   if (!command)
     throw new Error("Missing command. Supported commands: extract, new, refs");
-  if (command === "extract") return parseExtractArgs(rest);
-  if (command === "new") return parseNewArgs(rest);
-  if (command === "refs") return parseRefsArgs(rest);
+  if (command === "extract") {
+    const parsed = parseExtractArgs(rest);
+    return {
+      ...parsed,
+      options: {
+        ...parsed.options,
+        cwd,
+      },
+    };
+  }
+  if (command === "new") {
+    const parsed = parseNewArgs(rest);
+    return {
+      ...parsed,
+      options: {
+        ...parsed.options,
+        cwd,
+      },
+    };
+  }
+  if (command === "refs") {
+    const parsed = parseRefsArgs(rest);
+    return {
+      ...parsed,
+      options: {
+        ...parsed.options,
+        cwd,
+      },
+    };
+  }
   throw new Error(`Unsupported command: ${command}`);
 }
 

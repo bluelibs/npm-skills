@@ -77,6 +77,7 @@ describe("cli", () => {
     ).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         packageNames: ["@bluelibs/runner"],
         outputDir: ".agents/skills",
         only: ["@bluelibs/*", "left-pad"],
@@ -90,6 +91,7 @@ describe("cli", () => {
     expect(parseCliArgs(["extract", "--devDependencies"])).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         includeDevDependencies: true,
       },
     });
@@ -97,6 +99,7 @@ describe("cli", () => {
     expect(parseCliArgs(["extract", "--devDependencies=true"])).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         includeDevDependencies: true,
       },
     });
@@ -104,6 +107,7 @@ describe("cli", () => {
     expect(parseCliArgs(["extract", "--devDependencies", "false"])).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         includeDevDependencies: false,
       },
     });
@@ -111,6 +115,7 @@ describe("cli", () => {
     expect(parseCliArgs(["extract", "--dev", "false"])).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         includeDevDependencies: false,
       },
     });
@@ -118,6 +123,7 @@ describe("cli", () => {
     expect(parseCliArgs(["extract", "--dev=true"])).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         includeDevDependencies: true,
       },
     });
@@ -127,6 +133,7 @@ describe("cli", () => {
     ).toEqual({
       command: "extract",
       options: {
+        cwd: undefined,
         outputDir: "skills",
         only: ["pkg-a", "pkg-b"],
       },
@@ -135,6 +142,7 @@ describe("cli", () => {
     expect(parseCliArgs(["new", "my-skill"])).toEqual({
       command: "new",
       options: {
+        cwd: undefined,
         skillName: "my-skill",
       },
     });
@@ -142,6 +150,7 @@ describe("cli", () => {
     expect(parseCliArgs(["new", "my-skill", "--folder=./"])).toEqual({
       command: "new",
       options: {
+        cwd: undefined,
         skillName: "my-skill",
         folder: "./",
       },
@@ -150,6 +159,7 @@ describe("cli", () => {
     expect(parseCliArgs(["new", "my-skill", "--folder", "templates"])).toEqual({
       command: "new",
       options: {
+        cwd: undefined,
         skillName: "my-skill",
         folder: "templates",
       },
@@ -158,7 +168,26 @@ describe("cli", () => {
     expect(parseCliArgs(["refs", "materialize"])).toEqual({
       command: "refs",
       options: {
+        cwd: undefined,
         mode: "materialize",
+      },
+    });
+
+    expect(parseCliArgs(["--cwd", "/tmp/workspace", "extract"])).toEqual({
+      command: "extract",
+      options: {
+        cwd: "/tmp/workspace",
+      },
+    });
+
+    expect(
+      parseCliArgs(["new", "my-skill", "--cwd=packages/app", "--folder", "./"]),
+    ).toEqual({
+      command: "new",
+      options: {
+        cwd: "packages/app",
+        skillName: "my-skill",
+        folder: "./",
       },
     });
   });
@@ -176,6 +205,7 @@ describe("cli", () => {
     expect(() => parseCliArgs(["extract", "--devDependencies=maybe"])).toThrow(
       "Invalid boolean value: maybe",
     );
+    expect(() => parseCliArgs(["--cwd"])).toThrow("Missing value for --cwd");
     expect(() => parseCliArgs(["new"])).toThrow("Missing skill name for new");
     expect(() => parseCliArgs(["new", "one", "two"])).toThrow(
       "Unexpected extra arguments: two",
@@ -247,6 +277,53 @@ describe("cli", () => {
     callOptions.logger.warn("heads-up");
     expect(dependencies.logger.info).not.toHaveBeenCalled();
     expect(dependencies.logger.warn).toHaveBeenCalledWith("heads-up");
+  });
+
+  it("passes global cwd through to all commands", async () => {
+    extractSkills.mockResolvedValue({
+      outputDir: "/tmp/skills",
+      scannedPackages: [],
+      extracted: [],
+      skipped: [],
+      deletedSkills: 0,
+    });
+    createSkillTemplate.mockResolvedValue({
+      skillName: "my-skill",
+      skillDir: "/tmp/workspace/.agents/skills/my-skill",
+      skillFile: "/tmp/workspace/.agents/skills/my-skill/SKILL.md",
+    });
+    syncSkillPublishRefs.mockResolvedValue({
+      mode: "materialize",
+      synced: [],
+    });
+
+    const dependencies = createDependencies();
+
+    await expect(
+      runCli(["--cwd", "/tmp/workspace", "extract"], dependencies),
+    ).resolves.toBe(0);
+    expect(extractSkills).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        cwd: "/tmp/workspace",
+      }),
+    );
+
+    await expect(
+      runCli(["new", "my-skill", "--cwd=/tmp/workspace"], dependencies),
+    ).resolves.toBe(0);
+    expect(createSkillTemplate).toHaveBeenLastCalledWith({
+      cwd: "/tmp/workspace",
+      skillName: "my-skill",
+    });
+
+    await expect(
+      runCli(["refs", "materialize", "--cwd", "/tmp/workspace"], dependencies),
+    ).resolves.toBe(0);
+    expect(syncSkillPublishRefs).toHaveBeenLastCalledWith({
+      cwd: "/tmp/workspace",
+      mode: "materialize",
+      logger: dependencies.logger,
+    });
   });
 
   it("creates a skill template and reports its location", async () => {

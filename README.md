@@ -371,6 +371,7 @@ npm-skills extract [package-a package-b ...] [options]
 
 Options:
 
+- `--cwd <dir>`: project root to operate from, defaults to the current working directory
 - `--output <dir>`: destination folder, overrides `npmSkills.consume.output` or defaults to `.agents/skills`
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
 - `--skip-production`: skip extraction when `NODE_ENV` is `production`
@@ -383,6 +384,7 @@ Examples:
 
 ```bash
 npm-skills extract
+npm-skills --cwd packages/app extract
 npm-skills extract @bluelibs/runner my-package
 npm-skills extract --only "@bluelibs/*" --output .agents/skills
 npm-skills extract --skip-production
@@ -403,6 +405,7 @@ npm-skills new <skill-name> [options]
 
 Options:
 
+- `--cwd <dir>`: project root to operate from, defaults to the current working directory
 - `--folder <dir>`: destination root for the new skill, defaults to `.agents/skills`
 
 What it creates:
@@ -416,6 +419,7 @@ Examples:
 
 ```bash
 npm-skills new my-skill
+npm-skills --cwd packages/app new my-skill
 npm-skills new release-notes --folder ./
 ```
 
@@ -427,6 +431,7 @@ npm-skills refs <materialize|restore>
 
 Modes:
 
+- `--cwd <dir>`: project root to operate from, defaults to the current working directory
 - `materialize`: replace each configured destination with a copied snapshot of its source
 - `restore`: replace each configured destination with a symlink back to its source
 
@@ -435,6 +440,7 @@ Examples:
 ```bash
 npm-skills refs materialize
 npm-skills refs restore
+npm-skills --cwd packages/runner refs materialize
 ```
 
 Recommended everyday commands:
