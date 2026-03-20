@@ -50,11 +50,9 @@ async function detectLinkType(sourcePath: string): Promise<"dir" | "file"> {
 function resolveSymlinkTarget(
   sourcePath: string,
   destinationPath: string,
-  linkType: "dir" | "file",
 ): string {
   if (process.platform === "win32") {
-    // Windows junctions are the most reliable way to represent directory refs.
-    if (linkType === "dir") return sourcePath;
+    // Windows link targets should stay absolute for both files and directories.
     return sourcePath;
   }
 
@@ -87,11 +85,7 @@ async function restoreRef(
   await fs.rm(destinationPath, { recursive: true, force: true });
   await fs.mkdir(path.dirname(destinationPath), { recursive: true });
   const linkType = await detectLinkType(sourcePath);
-  const symlinkTarget = resolveSymlinkTarget(
-    sourcePath,
-    destinationPath,
-    linkType,
-  );
+  const symlinkTarget = resolveSymlinkTarget(sourcePath, destinationPath);
   const symlinkType = resolveSymlinkType(linkType);
   await fs.symlink(symlinkTarget, destinationPath, symlinkType);
 }
