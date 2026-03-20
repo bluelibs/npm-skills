@@ -13,6 +13,63 @@ async function writeJson(filePath: string, value: unknown): Promise<void> {
 }
 
 describe("refs", () => {
+  it("reads publish refs from the default policy file", async () => {
+    const cwd = await createTempProject();
+    const sourceDir = path.join(cwd, "readmes");
+    const destinationDir = path.join(
+      cwd,
+      "skills",
+      "core",
+      "references",
+      "readmes",
+    );
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+      npmSkills: {
+        publish: {
+          refs: [
+            {
+              source: "wrong",
+              destination: "skills/core/references/wrong",
+            },
+          ],
+        },
+      },
+    });
+    await writeJson(path.join(cwd, "npm-skills.policy.json"), {
+      publish: {
+        refs: [
+          {
+            source: "readmes",
+            destination: "skills/core/references/readmes",
+          },
+        ],
+      },
+    });
+    await fs.mkdir(sourceDir, { recursive: true });
+    await fs.writeFile(path.join(sourceDir, "README.md"), "# Shared\n");
+
+    await expect(
+      syncSkillPublishRefs({
+        cwd,
+        mode: "materialize",
+        logger: {
+          info: jest.fn(),
+          warn: jest.fn(),
+        },
+      }),
+    ).resolves.toEqual({
+      mode: "materialize",
+      synced: [
+        {
+          sourcePath: sourceDir,
+          destinationPath: destinationDir,
+        },
+      ],
+    });
+  });
+
   it("materializes and restores configured publish refs", async () => {
     const cwd = await createTempProject();
     const sourceDir = path.join(cwd, "readmes");
@@ -110,6 +167,64 @@ describe("refs", () => {
         mode: "materialize",
       }),
     ).rejects.toThrow("Ref source must stay within the project directory");
+  });
+
+  it("uses an explicit policy path instead of package.json", async () => {
+    const cwd = await createTempProject();
+    const sourceDir = path.join(cwd, "readmes");
+    const destinationDir = path.join(
+      cwd,
+      "skills",
+      "core",
+      "references",
+      "readmes",
+    );
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+      npmSkills: {
+        publish: {
+          refs: [
+            {
+              source: "wrong",
+              destination: "skills/core/references/wrong",
+            },
+          ],
+        },
+      },
+    });
+    await writeJson(path.join(cwd, "config/policy.json"), {
+      publish: {
+        refs: [
+          {
+            source: "readmes",
+            destination: "skills/core/references/readmes",
+          },
+        ],
+      },
+    });
+    await fs.mkdir(sourceDir, { recursive: true });
+    await fs.writeFile(path.join(sourceDir, "README.md"), "# Shared\n");
+
+    await expect(
+      syncSkillPublishRefs({
+        cwd,
+        mode: "restore",
+        policyPath: "config/policy.json",
+        logger: {
+          info: jest.fn(),
+          warn: jest.fn(),
+        },
+      }),
+    ).resolves.toEqual({
+      mode: "restore",
+      synced: [
+        {
+          sourcePath: sourceDir,
+          destinationPath: destinationDir,
+        },
+      ],
+    });
   });
 
   it("fails fast when a ref source is missing", async () => {
@@ -221,23 +336,30 @@ describe("refs", () => {
 
   it("rethrows unexpected access errors while checking ref sources", async () => {
     const cwd = await createTempProject();
-    const accessSpy = jest.spyOn(fs, "access").mockRejectedValue(
-      Object.assign(new Error("permission denied"), {
-        code: "EPERM",
-      }),
-    );
+    const policyPath = path.join(cwd, "config", "policy.json");
+    const accessSpy = jest
+      .spyOn(fs, "access")
+      .mockImplementation(async (targetPath) => {
+        if (String(targetPath) === path.join(cwd, "readmes")) {
+          throw Object.assign(new Error("permission denied"), {
+            code: "EPERM",
+          });
+        }
+
+        return undefined;
+      });
 
     await writeJson(path.join(cwd, "package.json"), {
       name: "fixture",
-      npmSkills: {
-        publish: {
-          refs: [
-            {
-              source: "readmes",
-              destination: "skills/core/references/readmes",
-            },
-          ],
-        },
+    });
+    await writeJson(policyPath, {
+      publish: {
+        refs: [
+          {
+            source: "readmes",
+            destination: "skills/core/references/readmes",
+          },
+        ],
       },
     });
 
@@ -245,9 +367,31 @@ describe("refs", () => {
       syncSkillPublishRefs({
         cwd,
         mode: "materialize",
+        policyPath: "config/policy.json",
       }),
     ).rejects.toThrow("permission denied");
     expect(accessSpy).toHaveBeenCalled();
+  });
+
+  it("fails when an explicit policy file is missing", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+      npmSkills: {
+        publish: {
+          refs: [],
+        },
+      },
+    });
+
+    await expect(
+      syncSkillPublishRefs({
+        cwd,
+        mode: "restore",
+        policyPath: "config/missing-policy.json",
+      }),
+    ).rejects.toThrow(/ENOENT/);
   });
 
   it("uses process.cwd when cwd is omitted", async () => {

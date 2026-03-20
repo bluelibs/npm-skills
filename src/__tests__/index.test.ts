@@ -15,6 +15,7 @@ describe("index exports", () => {
     expect(index.parseCliArgs).toBe(cli.parseCliArgs);
     expect(index.runCli).toBe(cli.runCli);
     expect(index.DEFAULT_OUTPUT_DIR).toBe(packageConfig.DEFAULT_OUTPUT_DIR);
+    expect(index.DEFAULT_POLICY_FILE).toBe(packageConfig.DEFAULT_POLICY_FILE);
     expect(index.DEFAULT_SKILLS_DIR).toBe(packageConfig.DEFAULT_SKILLS_DIR);
     expect(index.getDependencyPackageNames).toBe(
       packageConfig.getDependencyPackageNames,
@@ -30,6 +31,9 @@ describe("index exports", () => {
     );
     expect(index.readProjectPackageJson).toBe(
       packageConfig.readProjectPackageJson,
+    );
+    expect(index.readProjectNpmSkillsConfig).toBe(
+      packageConfig.readProjectNpmSkillsConfig,
     );
     expect(index.resolvePackageExportConfig).toBe(
       packageConfig.resolvePackageExportConfig,

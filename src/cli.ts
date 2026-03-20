@@ -49,6 +49,7 @@ Options:
     --cwd <dir>        Project root to operate from. Defaults to the current working directory
 
   extract:
+    --policy <path>    Read config from a dedicated JSON policy file
     --output <dir>     Destination directory. Overrides npmSkills.consume.output or .agents/skills
     --only <patterns>  Comma-separated package filters, for example "@scope/*,pkg-a"
     --skip-production  Skip extraction when NODE_ENV is production
@@ -61,6 +62,7 @@ Options:
     --folder <dir>     Template destination root. Defaults to .agents/skills
 
   refs:
+    --policy <path>    Read config from a dedicated JSON policy file
     materialize        Copy configured ref sources into skill destinations
     restore            Recreate symlinks from skill destinations back to sources
 
@@ -129,6 +131,17 @@ function parseExtractArgs(rest: string[]): ParsedExtractCliArgs {
 
     if (arg.startsWith("--output=")) {
       options.outputDir = arg.slice("--output=".length);
+      continue;
+    }
+
+    if (arg === "--policy") {
+      options.policyPath = getRequiredOptionValue(rest, index, "--policy");
+      index++;
+      continue;
+    }
+
+    if (arg.startsWith("--policy=")) {
+      options.policyPath = arg.slice("--policy=".length);
       continue;
     }
 
@@ -230,7 +243,33 @@ function parseNewArgs(rest: string[]): ParsedNewCliArgs {
 }
 
 function parseRefsArgs(rest: string[]): ParsedRefsCliArgs {
-  const [mode, ...extraArgs] = rest;
+  const options: SyncRefsOptions = {
+    mode: "materialize",
+  };
+  const positionals: string[] = [];
+
+  for (let index = 0; index < rest.length; index++) {
+    const arg = rest[index];
+
+    if (arg === "--policy") {
+      options.policyPath = getRequiredOptionValue(rest, index, "--policy");
+      index++;
+      continue;
+    }
+
+    if (arg.startsWith("--policy=")) {
+      options.policyPath = arg.slice("--policy=".length);
+      continue;
+    }
+
+    if (arg.startsWith("--")) {
+      throw new Error(`Unknown option: ${arg}`);
+    }
+
+    positionals.push(arg);
+  }
+
+  const [mode, ...extraArgs] = positionals;
 
   if (!mode) {
     throw new Error("Missing mode for refs. Expected: materialize or restore");
@@ -247,6 +286,7 @@ function parseRefsArgs(rest: string[]): ParsedRefsCliArgs {
   return {
     command: "refs",
     options: {
+      ...options,
       mode,
     },
   };

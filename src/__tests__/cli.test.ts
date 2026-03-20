@@ -67,6 +67,7 @@ describe("cli", () => {
       parseCliArgs([
         "extract",
         "@bluelibs/runner",
+        "--policy=config/npm-skills.json",
         "--output=.agents/skills",
         "--only=@bluelibs/*,left-pad",
         "--skip-production",
@@ -79,6 +80,7 @@ describe("cli", () => {
       options: {
         cwd: undefined,
         packageNames: ["@bluelibs/runner"],
+        policyPath: "config/npm-skills.json",
         outputDir: ".agents/skills",
         only: ["@bluelibs/*", "left-pad"],
         skipProduction: true,
@@ -139,6 +141,16 @@ describe("cli", () => {
       },
     });
 
+    expect(parseCliArgs(["extract", "--policy", "config/policy.json"])).toEqual(
+      {
+        command: "extract",
+        options: {
+          cwd: undefined,
+          policyPath: "config/policy.json",
+        },
+      },
+    );
+
     expect(parseCliArgs(["new", "my-skill"])).toEqual({
       command: "new",
       options: {
@@ -173,6 +185,28 @@ describe("cli", () => {
       },
     });
 
+    expect(
+      parseCliArgs(["refs", "restore", "--policy=./config/policy.json"]),
+    ).toEqual({
+      command: "refs",
+      options: {
+        cwd: undefined,
+        mode: "restore",
+        policyPath: "./config/policy.json",
+      },
+    });
+
+    expect(
+      parseCliArgs(["refs", "--policy", "config/policy.json", "materialize"]),
+    ).toEqual({
+      command: "refs",
+      options: {
+        cwd: undefined,
+        mode: "materialize",
+        policyPath: "config/policy.json",
+      },
+    });
+
     expect(parseCliArgs(["--cwd", "/tmp/workspace", "extract"])).toEqual({
       command: "extract",
       options: {
@@ -199,6 +233,9 @@ describe("cli", () => {
     expect(() => parseCliArgs(["extract", "--output"])).toThrow(
       "Missing value for --output",
     );
+    expect(() => parseCliArgs(["extract", "--policy"])).toThrow(
+      "Missing value for --policy",
+    );
     expect(() => parseCliArgs(["extract", "--only", "--override"])).toThrow(
       "Missing value for --only",
     );
@@ -219,6 +256,12 @@ describe("cli", () => {
     expect(() => parseCliArgs(["refs"])).toThrow("Missing mode for refs");
     expect(() => parseCliArgs(["refs", "pack"])).toThrow(
       "Unsupported refs mode: pack",
+    );
+    expect(() => parseCliArgs(["refs", "--wat", "restore"])).toThrow(
+      "Unknown option: --wat",
+    );
+    expect(() => parseCliArgs(["refs", "--policy"])).toThrow(
+      "Missing value for --policy",
     );
     expect(() => parseCliArgs(["refs", "restore", "again"])).toThrow(
       "Unexpected extra arguments: again",
@@ -300,11 +343,21 @@ describe("cli", () => {
     const dependencies = createDependencies();
 
     await expect(
-      runCli(["--cwd", "/tmp/workspace", "extract"], dependencies),
+      runCli(
+        [
+          "--cwd",
+          "/tmp/workspace",
+          "extract",
+          "--policy",
+          "config/policy.json",
+        ],
+        dependencies,
+      ),
     ).resolves.toBe(0);
     expect(extractSkills).toHaveBeenLastCalledWith(
       expect.objectContaining({
         cwd: "/tmp/workspace",
+        policyPath: "config/policy.json",
       }),
     );
 
@@ -317,11 +370,21 @@ describe("cli", () => {
     });
 
     await expect(
-      runCli(["refs", "materialize", "--cwd", "/tmp/workspace"], dependencies),
+      runCli(
+        [
+          "refs",
+          "materialize",
+          "--policy=/tmp/workspace/config/policy.json",
+          "--cwd",
+          "/tmp/workspace",
+        ],
+        dependencies,
+      ),
     ).resolves.toBe(0);
     expect(syncSkillPublishRefs).toHaveBeenLastCalledWith({
       cwd: "/tmp/workspace",
       mode: "materialize",
+      policyPath: "/tmp/workspace/config/policy.json",
       logger: dependencies.logger,
     });
   });

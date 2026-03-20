@@ -3,12 +3,14 @@ export { createSkillTemplate } from "./new-skill";
 export { syncSkillPublishRefs } from "./refs";
 export { getHelpText, parseCliArgs, runCli } from "./cli";
 export {
+  DEFAULT_POLICY_FILE,
   DEFAULT_OUTPUT_DIR,
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
   getDependencySections,
   getPackageSkillSourceDir,
   readInstalledPackageJson,
+  readProjectNpmSkillsConfig,
   readProjectPackageJson,
   resolvePackageExportConfig,
   resolveNpmSkillsConfig,

@@ -70,6 +70,7 @@ export interface InstalledPackageJson {
 
 export interface ExtractOptions {
   cwd?: string;
+  policyPath?: string;
   outputDir?: string;
   only?: string[];
   packageNames?: string[];
@@ -136,6 +137,7 @@ export interface CreateSkillTemplateReport {
 
 export interface SyncRefsOptions {
   cwd?: string;
+  policyPath?: string;
   mode: "materialize" | "restore";
   logger?: Logger;
 }

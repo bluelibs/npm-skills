@@ -1,9 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import {
-  readProjectPackageJson,
-  resolveNpmSkillsConfig,
-} from "./package-config";
+import { readProjectNpmSkillsConfig } from "./package-config";
 import { Logger, SyncRefsOptions, SyncRefsReport } from "./types";
 
 const DEFAULT_LOGGER: Logger = {
@@ -104,8 +101,7 @@ export async function syncSkillPublishRefs(
 ): Promise<SyncRefsReport> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const logger = options.logger ?? DEFAULT_LOGGER;
-  const packageJson = await readProjectPackageJson(cwd);
-  const config = resolveNpmSkillsConfig(packageJson);
+  const config = await readProjectNpmSkillsConfig(cwd, options.policyPath);
   const synced: SyncRefsReport["synced"] = [];
 
   for (const ref of config.publish.refs) {

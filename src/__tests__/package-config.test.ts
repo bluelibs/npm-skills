@@ -1,17 +1,33 @@
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import {
+  DEFAULT_POLICY_FILE,
   DEFAULT_OUTPUT_DIR,
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
   getDependencySections,
   getPackageSkillSourceDir,
+  readInstalledPackageJson,
+  readProjectNpmSkillsConfig,
   resolvePackageExportConfig,
   resolveNpmSkillsConfig,
 } from "../package-config";
+
+async function createTempProject(): Promise<string> {
+  return fs.mkdtemp(path.join(os.tmpdir(), "npm-skills-config-"));
+}
+
+async function writeJson(filePath: string, value: unknown): Promise<void> {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2));
+}
 
 describe("package-config", () => {
   it("exposes separate defaults for package sources and extraction output", () => {
     expect(DEFAULT_SKILLS_DIR).toBe("skills");
     expect(DEFAULT_OUTPUT_DIR).toBe(".agents/skills");
+    expect(DEFAULT_POLICY_FILE).toBe("npm-skills.policy.json");
   });
 
   it("resolves consume and publish config from npmSkills", () => {
@@ -287,5 +303,179 @@ describe("package-config", () => {
         disabled: false,
       },
     });
+  });
+
+  it("reads config from the default policy file before package.json", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/from-package",
+        },
+      },
+    });
+    await writeJson(path.join(cwd, DEFAULT_POLICY_FILE), {
+      consume: {
+        output: ".agents/skills/from-policy",
+      },
+    });
+
+    await expect(readProjectNpmSkillsConfig(cwd)).resolves.toEqual({
+      consume: {
+        only: [],
+        map: {},
+        output: ".agents/skills/from-policy",
+      },
+      publish: {
+        source: DEFAULT_SKILLS_DIR,
+        exports: [],
+        refs: [],
+        disabled: false,
+      },
+    });
+  });
+
+  it("reads config from an explicit policy path without falling back", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/from-package",
+        },
+      },
+    });
+    await writeJson(path.join(cwd, DEFAULT_POLICY_FILE), {
+      consume: {
+        output: ".agents/skills/from-default-policy",
+      },
+    });
+    await writeJson(path.join(cwd, "config/custom-policy.json"), {
+      consume: {
+        output: ".agents/skills/from-explicit-policy",
+      },
+    });
+
+    await expect(
+      readProjectNpmSkillsConfig(cwd, "config/custom-policy.json"),
+    ).resolves.toEqual({
+      consume: {
+        only: [],
+        map: {},
+        output: ".agents/skills/from-explicit-policy",
+      },
+      publish: {
+        source: DEFAULT_SKILLS_DIR,
+        exports: [],
+        refs: [],
+        disabled: false,
+      },
+    });
+  });
+
+  it("falls back to package.json when no policy file exists", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/from-package",
+        },
+      },
+    });
+
+    await expect(readProjectNpmSkillsConfig(cwd)).resolves.toEqual({
+      consume: {
+        only: [],
+        map: {},
+        output: ".agents/skills/from-package",
+      },
+      publish: {
+        source: DEFAULT_SKILLS_DIR,
+        exports: [],
+        refs: [],
+        disabled: false,
+      },
+    });
+  });
+
+  it("reads installed package.json files", async () => {
+    const cwd = await createTempProject();
+    const packageJsonPath = path.join(
+      cwd,
+      "node_modules",
+      "pkg",
+      "package.json",
+    );
+
+    await writeJson(packageJsonPath, {
+      name: "pkg",
+      version: "1.2.3",
+      npmSkills: {
+        publish: {
+          source: "my-skills",
+        },
+      },
+    });
+
+    await expect(readInstalledPackageJson(packageJsonPath)).resolves.toEqual({
+      name: "pkg",
+      version: "1.2.3",
+      npmSkills: {
+        publish: {
+          source: "my-skills",
+        },
+      },
+    });
+  });
+
+  it("fails when an explicit policy path is missing", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+    });
+
+    await expect(
+      readProjectNpmSkillsConfig(cwd, "config/missing-policy.json"),
+    ).rejects.toThrow(/ENOENT/);
+  });
+
+  it("fails when a discovered policy file contains invalid JSON", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+    });
+    await fs.writeFile(path.join(cwd, DEFAULT_POLICY_FILE), "{bad json");
+
+    await expect(readProjectNpmSkillsConfig(cwd)).rejects.toThrow(
+      /Unexpected token|Expected property name/i,
+    );
+  });
+
+  it("rethrows unexpected access errors while checking the default policy path", async () => {
+    const cwd = await createTempProject();
+    const accessSpy = jest
+      .spyOn(fs, "access")
+      .mockImplementation(async (targetPath) => {
+        if (String(targetPath) === path.join(cwd, DEFAULT_POLICY_FILE)) {
+          throw Object.assign(new Error("permission denied"), {
+            code: "EPERM",
+          });
+        }
+
+        return undefined;
+      });
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+    });
+
+    await expect(readProjectNpmSkillsConfig(cwd)).rejects.toThrow(
+      "permission denied",
+    );
+    expect(accessSpy).toHaveBeenCalled();
   });
 });

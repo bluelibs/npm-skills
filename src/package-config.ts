@@ -16,6 +16,7 @@ import {
 
 export const DEFAULT_SKILLS_DIR = "skills";
 export const DEFAULT_OUTPUT_DIR = ".agents/skills";
+export const DEFAULT_POLICY_FILE = "npm-skills.policy.json";
 
 function isNpmSkillsConfig(value: unknown): value is NpmSkillsConfig {
   return Boolean(value) && typeof value === "object";
@@ -168,10 +169,20 @@ export async function readInstalledPackageJson(
   return JSON.parse(content) as InstalledPackageJson;
 }
 
-export function resolveNpmSkillsConfig(
-  packageJson: ProjectPackageJson,
+async function pathExists(targetPath: string): Promise<boolean> {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw error;
+  }
+}
+
+function resolveRawNpmSkillsConfig(
+  value: false | NpmSkillsConfig | undefined,
 ): ResolvedNpmSkillsConfig {
-  const value = packageJson.npmSkills;
   const config = isNpmSkillsConfig(value) ? value : undefined;
   const consume = resolveConsumeConfig(config);
   const only = resolveConsumeOnly(config);
@@ -182,8 +193,41 @@ export function resolveNpmSkillsConfig(
       map: consume.map,
       output: consume.output,
     },
-    publish: resolvePublishConfig(packageJson),
+    publish: resolvePublishConfig({ npmSkills: value }),
   };
+}
+
+export function resolveNpmSkillsConfig(
+  packageJson: ProjectPackageJson,
+): ResolvedNpmSkillsConfig {
+  return resolveRawNpmSkillsConfig(packageJson.npmSkills);
+}
+
+export async function readProjectNpmSkillsConfig(
+  cwd: string,
+  policyPath?: string,
+): Promise<ResolvedNpmSkillsConfig> {
+  const resolvedCwd = path.resolve(cwd);
+  const explicitPolicyPath =
+    typeof policyPath === "string" ? path.resolve(resolvedCwd, policyPath) : "";
+
+  if (explicitPolicyPath) {
+    const content = await fs.readFile(explicitPolicyPath, "utf8");
+    return resolveRawNpmSkillsConfig(
+      JSON.parse(content) as false | NpmSkillsConfig,
+    );
+  }
+
+  const defaultPolicyPath = path.join(resolvedCwd, DEFAULT_POLICY_FILE);
+  if (await pathExists(defaultPolicyPath)) {
+    const content = await fs.readFile(defaultPolicyPath, "utf8");
+    return resolveRawNpmSkillsConfig(
+      JSON.parse(content) as false | NpmSkillsConfig,
+    );
+  }
+
+  const packageJson = await readProjectPackageJson(resolvedCwd);
+  return resolveNpmSkillsConfig(packageJson);
 }
 
 export function getDependencySections(

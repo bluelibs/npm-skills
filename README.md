@@ -220,7 +220,40 @@ Generated local skills include a `LICENSE.txt`.
 
 ## Configuration
 
-You can configure both sides of the workflow from `package.json` using the `npmSkills` key:
+You can configure both sides of the workflow with a dedicated `npm-skills.policy.json` file or from `package.json` using the `npmSkills` key.
+
+`npm-skills.policy.json` uses the same schema as `package.json.npmSkills`, but at the JSON file root:
+
+```json
+{
+  "consume": {
+    "only": ["@scope/*", "my-package"],
+    "output": ".agents/skills/extracted",
+    "map": {
+      "@bluelibs/runner": ".agents/skills",
+      "some-package": "resources/skills"
+    }
+  },
+  "publish": {
+    "source": ".agents/skills",
+    "export": ["public", "react"],
+    "refs": [
+      {
+        "source": "readmes",
+        "destination": "skills/core/references/readmes"
+      }
+    ]
+  }
+}
+```
+
+Config precedence is:
+
+- `--policy <path>` on the CLI or `policyPath` in the API
+- `./npm-skills.policy.json`
+- `package.json.npmSkills`
+
+If you prefer to keep config in `package.json`, the equivalent shape is:
 
 - `consume`: how this project reads skills from installed dependencies
 - `publish`: how this package exposes its own skills to others
@@ -372,7 +405,8 @@ npm-skills extract [package-a package-b ...] [options]
 Options:
 
 - `--cwd <dir>`: project root to operate from, defaults to the current working directory
-- `--output <dir>`: destination folder, overrides `npmSkills.consume.output` or defaults to `.agents/skills`
+- `--policy <path>`: read config from a dedicated JSON policy file
+- `--output <dir>`: destination folder, overrides `consume.output` from the selected config or defaults to `.agents/skills`
 - `--only <patterns>`: comma-separated package filters such as `@scope/*,pkg-a`
 - `--skip-production`: skip extraction when `NODE_ENV` is `production`
 - `--devDependencies <true|false>`: include dev dependencies in the package scan, defaults to `true`
@@ -385,6 +419,7 @@ Examples:
 ```bash
 npm-skills extract
 npm-skills --cwd packages/app extract
+npm-skills extract --policy config/npm-skills/policy.json
 npm-skills extract @bluelibs/runner my-package
 npm-skills extract --only "@bluelibs/*" --output .agents/skills
 npm-skills extract --skip-production
@@ -426,12 +461,13 @@ npm-skills new release-notes --folder ./
 ### `refs`
 
 ```bash
-npm-skills refs <materialize|restore>
+npm-skills refs <materialize|restore> [options]
 ```
 
-Modes:
+Modes and options:
 
 - `--cwd <dir>`: project root to operate from, defaults to the current working directory
+- `--policy <path>`: read config from a dedicated JSON policy file
 - `materialize`: replace each configured destination with a copied snapshot of its source
 - `restore`: replace each configured destination with a symlink back to its source
 
@@ -440,6 +476,7 @@ Examples:
 ```bash
 npm-skills refs materialize
 npm-skills refs restore
+npm-skills refs restore --policy config/npm-skills/policy.json
 npm-skills --cwd packages/runner refs materialize
 ```
 
@@ -464,6 +501,7 @@ import { extractSkills } from "npm-skills";
 
 const report = await extractSkills({
   cwd: process.cwd(),
+  policyPath: "config/npm-skills/policy.json",
   outputDir: ".agents/skills",
   only: ["@bluelibs/*"],
   skipProduction: true,
@@ -496,6 +534,7 @@ import { syncSkillPublishRefs } from "npm-skills";
 
 await syncSkillPublishRefs({
   cwd: process.cwd(),
+  policyPath: "config/npm-skills/policy.json",
   mode: "materialize",
 });
 ```

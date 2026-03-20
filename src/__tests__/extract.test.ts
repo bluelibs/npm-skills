@@ -205,6 +205,85 @@ describe("extractSkills", () => {
     ).resolves.toBe("# Basic\n");
   });
 
+  it("prefers the default policy file over package.json config", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/from-package",
+        },
+      },
+    });
+    await writeJson(path.join(cwd, "npm-skills.policy.json"), {
+      consume: {
+        output: ".agents/skills/from-policy",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    const report = await extractSkills({ cwd });
+
+    expect(await fs.realpath(report.outputDir)).toBe(
+      await fs.realpath(path.join(cwd, ".agents/skills/from-policy")),
+    );
+  });
+
+  it("uses an explicit policy path instead of package.json config", async () => {
+    const cwd = await createTempProject();
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "consumer",
+      dependencies: {
+        "default-package": "1.0.0",
+      },
+      npmSkills: {
+        consume: {
+          output: ".agents/skills/from-package",
+        },
+      },
+    });
+    await writeJson(path.join(cwd, "config/policy.json"), {
+      consume: {
+        output: ".agents/skills/from-explicit-policy",
+      },
+    });
+    await writeJson(
+      path.join(cwd, "node_modules/default-package/package.json"),
+      {
+        name: "default-package",
+        version: "1.0.0",
+      },
+    );
+    await writeFile(
+      path.join(cwd, "node_modules/default-package/skills/basic/SKILL.md"),
+      "# Basic\n",
+    );
+
+    const report = await extractSkills({
+      cwd,
+      policyPath: "config/policy.json",
+    });
+
+    expect(await fs.realpath(report.outputDir)).toBe(
+      await fs.realpath(path.join(cwd, ".agents/skills/from-explicit-policy")),
+    );
+  });
+
   it("rejects npmSkills.consume.output values that escape the project directory", async () => {
     const cwd = await createTempProject();
 

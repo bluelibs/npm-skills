@@ -5,9 +5,9 @@ import {
   DEFAULT_SKILLS_DIR,
   getDependencyPackageNames,
   readInstalledPackageJson,
+  readProjectNpmSkillsConfig,
   readProjectPackageJson,
   resolvePackageExportConfig,
-  resolveNpmSkillsConfig,
 } from "./package-config";
 import {
   matchesAnyPattern,
@@ -295,7 +295,10 @@ export async function extractSkills(
   const pruneStaleSkills = shouldPruneStaleSkills(options);
 
   const projectPackageJson = await readProjectPackageJson(cwd);
-  const projectConfig = resolveNpmSkillsConfig(projectPackageJson);
+  const projectConfig = await readProjectNpmSkillsConfig(
+    cwd,
+    options.policyPath,
+  );
   const outputDir = resolveOutputDirWithinProject(
     cwd,
     options.outputDir ?? projectConfig.consume.output,
