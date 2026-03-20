@@ -20,6 +20,26 @@ function expectedLinkTarget(
   return path.relative(path.dirname(destinationPath), sourcePath);
 }
 
+async function withMockedPlatform<T>(
+  platform: NodeJS.Platform,
+  run: () => Promise<T>,
+): Promise<T> {
+  const originalPlatform = process.platform;
+  Object.defineProperty(process, "platform", {
+    configurable: true,
+    value: platform,
+  });
+
+  try {
+    return await run();
+  } finally {
+    Object.defineProperty(process, "platform", {
+      configurable: true,
+      value: originalPlatform,
+    });
+  }
+}
+
 describe("refs", () => {
   it("reads publish refs from the default policy file", async () => {
     const cwd = await createTempProject();
@@ -438,7 +458,6 @@ describe("refs", () => {
 
   it("uses Windows junctions for directory refs", async () => {
     const cwd = await createTempProject();
-    const originalPlatform = process.platform;
     const sourceDir = path.join(cwd, "readmes");
     const destinationDir = path.join(
       cwd,
@@ -466,12 +485,7 @@ describe("refs", () => {
     });
     await fs.mkdir(sourceDir, { recursive: true });
 
-    Object.defineProperty(process, "platform", {
-      configurable: true,
-      value: "win32",
-    });
-
-    try {
+    await withMockedPlatform("win32", async () => {
       await expect(
         syncSkillPublishRefs({
           cwd,
@@ -490,12 +504,7 @@ describe("refs", () => {
           },
         ],
       });
-    } finally {
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: originalPlatform,
-      });
-    }
+    });
 
     expect(symlinkSpy).toHaveBeenCalledWith(
       sourceDir,
@@ -506,7 +515,6 @@ describe("refs", () => {
 
   it("uses Windows file symlinks with absolute targets for file refs", async () => {
     const cwd = await createTempProject();
-    const originalPlatform = process.platform;
     const sourceFile = path.join(cwd, "docs", "guide.md");
     const destinationFile = path.join(
       cwd,
@@ -535,12 +543,7 @@ describe("refs", () => {
     await fs.mkdir(path.dirname(sourceFile), { recursive: true });
     await fs.writeFile(sourceFile, "# Guide\n");
 
-    Object.defineProperty(process, "platform", {
-      configurable: true,
-      value: "win32",
-    });
-
-    try {
+    await withMockedPlatform("win32", async () => {
       await expect(
         syncSkillPublishRefs({
           cwd,
@@ -559,15 +562,125 @@ describe("refs", () => {
           },
         ],
       });
-    } finally {
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: originalPlatform,
-      });
-    }
+    });
 
     expect(symlinkSpy).toHaveBeenCalledWith(
       sourceFile,
+      destinationFile,
+      "file",
+    );
+  });
+
+  it("uses relative directory symlinks on non-Windows", async () => {
+    const cwd = await createTempProject();
+    const sourceDir = path.join(cwd, "readmes");
+    const destinationDir = path.join(
+      cwd,
+      "skills",
+      "core",
+      "references",
+      "readmes",
+    );
+    const symlinkSpy = jest
+      .spyOn(fs, "symlink")
+      .mockResolvedValue(undefined as never);
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+      npmSkills: {
+        publish: {
+          refs: [
+            {
+              source: "readmes",
+              destination: "skills/core/references/readmes",
+            },
+          ],
+        },
+      },
+    });
+    await fs.mkdir(sourceDir, { recursive: true });
+
+    await withMockedPlatform("linux", async () => {
+      await expect(
+        syncSkillPublishRefs({
+          cwd,
+          mode: "restore",
+          logger: {
+            info: jest.fn(),
+            warn: jest.fn(),
+          },
+        }),
+      ).resolves.toEqual({
+        mode: "restore",
+        synced: [
+          {
+            sourcePath: sourceDir,
+            destinationPath: destinationDir,
+          },
+        ],
+      });
+    });
+
+    expect(symlinkSpy).toHaveBeenCalledWith(
+      path.relative(path.dirname(destinationDir), sourceDir),
+      destinationDir,
+      "dir",
+    );
+  });
+
+  it("uses relative file symlinks on non-Windows", async () => {
+    const cwd = await createTempProject();
+    const sourceFile = path.join(cwd, "docs", "guide.md");
+    const destinationFile = path.join(
+      cwd,
+      "skills",
+      "core",
+      "references",
+      "guide.md",
+    );
+    const symlinkSpy = jest
+      .spyOn(fs, "symlink")
+      .mockResolvedValue(undefined as never);
+
+    await writeJson(path.join(cwd, "package.json"), {
+      name: "fixture",
+      npmSkills: {
+        publish: {
+          refs: [
+            {
+              source: "docs/guide.md",
+              destination: "skills/core/references/guide.md",
+            },
+          ],
+        },
+      },
+    });
+    await fs.mkdir(path.dirname(sourceFile), { recursive: true });
+    await fs.writeFile(sourceFile, "# Guide\n");
+
+    await withMockedPlatform("linux", async () => {
+      await expect(
+        syncSkillPublishRefs({
+          cwd,
+          mode: "restore",
+          logger: {
+            info: jest.fn(),
+            warn: jest.fn(),
+          },
+        }),
+      ).resolves.toEqual({
+        mode: "restore",
+        synced: [
+          {
+            sourcePath: sourceFile,
+            destinationPath: destinationFile,
+          },
+        ],
+      });
+    });
+
+    expect(symlinkSpy).toHaveBeenCalledWith(
+      path.relative(path.dirname(destinationFile), sourceFile),
       destinationFile,
       "file",
     );
