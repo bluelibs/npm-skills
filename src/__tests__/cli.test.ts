@@ -10,6 +10,7 @@ import {
   ExtractReport,
   Logger,
   OverwritePrompt,
+  SyncRefsReport,
 } from "../types";
 
 jest.mock("../extract", () => ({
@@ -18,6 +19,9 @@ jest.mock("../extract", () => ({
 jest.mock("../new-skill", () => ({
   createSkillTemplate: jest.fn(),
 }));
+jest.mock("../refs", () => ({
+  syncSkillPublishRefs: jest.fn(),
+}));
 
 const { extractSkills } = jest.requireMock("../extract") as {
   extractSkills: jest.Mock<Promise<ExtractReport>, [unknown]>;
@@ -25,10 +29,14 @@ const { extractSkills } = jest.requireMock("../extract") as {
 const { createSkillTemplate } = jest.requireMock("../new-skill") as {
   createSkillTemplate: jest.Mock<Promise<CreateSkillTemplateReport>, [unknown]>;
 };
+const { syncSkillPublishRefs } = jest.requireMock("../refs") as {
+  syncSkillPublishRefs: jest.Mock<Promise<SyncRefsReport>, [unknown]>;
+};
 
 beforeEach(() => {
   extractSkills.mockReset();
   createSkillTemplate.mockReset();
+  syncSkillPublishRefs.mockReset();
 });
 
 function createDependencies(
@@ -146,6 +154,13 @@ describe("cli", () => {
         folder: "templates",
       },
     });
+
+    expect(parseCliArgs(["refs", "materialize"])).toEqual({
+      command: "refs",
+      options: {
+        mode: "materialize",
+      },
+    });
   });
 
   it("throws on invalid arguments and booleans", () => {
@@ -170,6 +185,13 @@ describe("cli", () => {
     );
     expect(() => parseCliArgs(["new", "my-skill", "--wat"])).toThrow(
       "Unknown option: --wat",
+    );
+    expect(() => parseCliArgs(["refs"])).toThrow("Missing mode for refs");
+    expect(() => parseCliArgs(["refs", "pack"])).toThrow(
+      "Unsupported refs mode: pack",
+    );
+    expect(() => parseCliArgs(["refs", "restore", "again"])).toThrow(
+      "Unexpected extra arguments: again",
     );
   });
 
@@ -245,6 +267,31 @@ describe("cli", () => {
     expect(extractSkills).not.toHaveBeenCalled();
   });
 
+  it("runs the refs sync utility and reports summary", async () => {
+    syncSkillPublishRefs.mockResolvedValue({
+      mode: "restore",
+      synced: [
+        {
+          sourcePath: "/tmp/readmes",
+          destinationPath: "/tmp/skills/core/references/readmes",
+        },
+      ],
+    });
+
+    const dependencies = createDependencies();
+    await expect(runCli(["refs", "restore"], dependencies)).resolves.toBe(0);
+
+    expect(syncSkillPublishRefs).toHaveBeenCalledWith({
+      mode: "restore",
+      logger: dependencies.logger,
+    });
+    expect(dependencies.stdout.log).toHaveBeenCalledWith(
+      "Synchronized 1 publish refs in restore mode.",
+    );
+    expect(extractSkills).not.toHaveBeenCalled();
+    expect(createSkillTemplate).not.toHaveBeenCalled();
+  });
+
   it("shows help for bare cli and help flags", async () => {
     const dependencies = createDependencies();
 
@@ -304,6 +351,13 @@ describe("cli", () => {
     expect(fourthDependencies.stdout.error).toHaveBeenCalledWith(
       "already there",
     );
+
+    syncSkillPublishRefs.mockRejectedValueOnce(new Error("bad refs"));
+    const fifthDependencies = createDependencies();
+    await expect(
+      runCli(["refs", "materialize"], fifthDependencies),
+    ).resolves.toBe(1);
+    expect(fifthDependencies.stdout.error).toHaveBeenCalledWith("bad refs");
   });
 
   it("can build default dependencies when none are provided", async () => {

@@ -4,11 +4,13 @@ import * as index from "../index";
 import * as newSkill from "../new-skill";
 import * as packageConfig from "../package-config";
 import * as patterns from "../patterns";
+import * as refs from "../refs";
 
 describe("index exports", () => {
   it("re-exports the public api", () => {
     expect(index.extractSkills).toBe(extract.extractSkills);
     expect(index.createSkillTemplate).toBe(newSkill.createSkillTemplate);
+    expect(index.syncSkillPublishRefs).toBe(refs.syncSkillPublishRefs);
     expect(index.getHelpText).toBe(cli.getHelpText);
     expect(index.parseCliArgs).toBe(cli.parseCliArgs);
     expect(index.runCli).toBe(cli.runCli);

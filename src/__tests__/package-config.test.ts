@@ -27,6 +27,12 @@ describe("package-config", () => {
         publish: {
           source: ".agents/skills",
           export: ["public", "react"],
+          refs: [
+            {
+              source: "readmes",
+              destination: "skills/core/references/readmes",
+            },
+          ],
         },
       },
     });
@@ -42,6 +48,12 @@ describe("package-config", () => {
       publish: {
         source: ".agents/skills",
         exports: ["public", "react"],
+        refs: [
+          {
+            source: "readmes",
+            destination: "skills/core/references/readmes",
+          },
+        ],
         disabled: false,
       },
     });
@@ -74,6 +86,7 @@ describe("package-config", () => {
       publish: {
         source: ".modern/publish",
         exports: ["modern"],
+        refs: [],
         disabled: false,
       },
     });
@@ -95,6 +108,7 @@ describe("package-config", () => {
       publish: {
         source: DEFAULT_SKILLS_DIR,
         exports: [],
+        refs: [],
         disabled: false,
       },
     });
@@ -187,16 +201,19 @@ describe("package-config", () => {
     ).toEqual({
       source: "my-skillz",
       exports: ["runner", "architecture"],
+      refs: [],
       disabled: false,
     });
     expect(resolvePackageExportConfig({ npmSkills: true as never })).toEqual({
       source: DEFAULT_SKILLS_DIR,
       exports: [],
+      refs: [],
       disabled: false,
     });
     expect(resolvePackageExportConfig({ npmSkills: {} })).toEqual({
       source: DEFAULT_SKILLS_DIR,
       exports: [],
+      refs: [],
       disabled: false,
     });
     expect(
@@ -210,6 +227,7 @@ describe("package-config", () => {
     ).toEqual({
       source: DEFAULT_SKILLS_DIR,
       exports: ["ok"],
+      refs: [],
       disabled: false,
     });
     expect(
@@ -228,5 +246,46 @@ describe("package-config", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("filters invalid publish refs while keeping valid ones", () => {
+    expect(
+      resolveNpmSkillsConfig({
+        npmSkills: {
+          publish: {
+            refs: [
+              {
+                source: "readmes",
+                destination: "skills/core/references/readmes",
+              },
+              {
+                source: "docs",
+              } as never,
+              {
+                destination: "skills/core/references/docs",
+              } as never,
+              1 as never,
+            ],
+          },
+        },
+      }),
+    ).toEqual({
+      consume: {
+        only: [],
+        map: {},
+        output: DEFAULT_OUTPUT_DIR,
+      },
+      publish: {
+        source: DEFAULT_SKILLS_DIR,
+        exports: [],
+        refs: [
+          {
+            source: "readmes",
+            destination: "skills/core/references/readmes",
+          },
+        ],
+        disabled: false,
+      },
+    });
   });
 });

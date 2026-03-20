@@ -1,5 +1,6 @@
 export { extractSkills } from "./extract";
 export { createSkillTemplate } from "./new-skill";
+export { syncSkillPublishRefs } from "./refs";
 export { getHelpText, parseCliArgs, runCli } from "./cli";
 export {
   DEFAULT_OUTPUT_DIR,
@@ -34,6 +35,7 @@ export type {
   NpmSkillsConsumeConfig,
   NpmSkillsConfig,
   NpmSkillsPublishConfig,
+  NpmSkillsPublishRefConfig,
   OverwritePrompt,
   PackageExportConfig,
   PackageNpmSkillsConfig,
@@ -41,5 +43,9 @@ export type {
   ResolvedNpmSkillsConsumeConfig,
   ResolvedNpmSkillsConfig,
   ResolvedNpmSkillsPublishConfig,
+  ResolvedNpmSkillsPublishRefConfig,
   SkippedSkill,
+  SyncRefsOptions,
+  SyncRefsReport,
+  SyncedPublishRef,
 } from "./types";

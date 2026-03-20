@@ -240,7 +240,13 @@ Example:
     },
     "publish": {
       "source": ".agents/skills",
-      "export": ["public", "react"]
+      "export": ["public", "react"],
+      "refs": [
+        {
+          "source": "readmes",
+          "destination": "skills/core/references/readmes"
+        }
+      ]
     }
   }
 }
@@ -276,6 +282,40 @@ Example:
 - Optional list of top-level skill folders to expose
 - If omitted, every discovered skill under `publish.source` can be published
 - If set to `false`, this package opts out of skill publishing
+
+`publish.refs`
+
+- Optional list of shared docs or assets that should appear inside published skills
+- Each entry uses a project-relative `source` and `destination`
+- Intended for repos that keep canonical docs in places like `readmes/` or `docs/`, then link them into `skills/.../references/...` during development
+- Pair it with `npm-skills refs materialize` in `prepack` and `npm-skills refs restore` in `postpack`
+
+Example:
+
+```json
+{
+  "scripts": {
+    "prepack": "npm-skills refs materialize",
+    "postpack": "npm-skills refs restore"
+  },
+  "npmSkills": {
+    "publish": {
+      "refs": [
+        {
+          "source": "readmes",
+          "destination": "skills/core/references/readmes"
+        },
+        {
+          "source": "guide-units",
+          "destination": "skills/core/references/guide-units"
+        }
+      ]
+    }
+  }
+}
+```
+
+This matches the pattern used in repos like `runner`: keep the docs authored once in top-level folders, symlink them into skill references while developing, materialize real files for the packed tarball, then restore the symlinks afterward.
 
 If a package wants to export only some skill folders:
 
@@ -379,6 +419,24 @@ npm-skills new my-skill
 npm-skills new release-notes --folder ./
 ```
 
+### `refs`
+
+```bash
+npm-skills refs <materialize|restore>
+```
+
+Modes:
+
+- `materialize`: replace each configured destination with a copied snapshot of its source
+- `restore`: replace each configured destination with a symlink back to its source
+
+Examples:
+
+```bash
+npm-skills refs materialize
+npm-skills refs restore
+```
+
 Recommended everyday commands:
 
 ```bash
@@ -386,6 +444,7 @@ npm-skills extract
 npm-skills extract --override
 npm-skills extract --only "@bluelibs/*"
 npm-skills new my-skill
+npm-skills refs materialize
 ```
 
 ## Programmatic API
@@ -422,6 +481,17 @@ const report = await createSkillTemplate({
 });
 
 console.log(report.skillDir);
+```
+
+Sync shared publish refs:
+
+```ts
+import { syncSkillPublishRefs } from "npm-skills";
+
+await syncSkillPublishRefs({
+  cwd: process.cwd(),
+  mode: "materialize",
+});
 ```
 
 `extractSkills()` returns:

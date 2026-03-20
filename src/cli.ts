@@ -3,11 +3,13 @@ import { stdin, stdout } from "node:process";
 import { extractSkills } from "./extract";
 import { createSkillTemplate } from "./new-skill";
 import { splitCommaSeparatedValues } from "./patterns";
+import { syncSkillPublishRefs } from "./refs";
 import {
   CliDependencies,
   CreateSkillTemplateOptions,
   ExtractOptions,
   OverwritePrompt,
+  SyncRefsOptions,
 } from "./types";
 
 export interface ParsedExtractCliArgs {
@@ -20,13 +22,22 @@ export interface ParsedNewCliArgs {
   options: CreateSkillTemplateOptions;
 }
 
-export type ParsedCliArgs = ParsedExtractCliArgs | ParsedNewCliArgs;
+export interface ParsedRefsCliArgs {
+  command: "refs";
+  options: SyncRefsOptions;
+}
+
+export type ParsedCliArgs =
+  | ParsedExtractCliArgs
+  | ParsedNewCliArgs
+  | ParsedRefsCliArgs;
 
 const HELP_TEXT = `npm-skills
 
 Usage:
   npm-skills extract [package-a package-b ...] [options]
   npm-skills new <skill-name> [options]
+  npm-skills refs <materialize|restore>
 
 Options:
   extract:
@@ -40,6 +51,10 @@ Options:
 
   new:
     --folder <dir>     Template destination root. Defaults to .agents/skills
+
+  refs:
+    materialize        Copy configured ref sources into skill destinations
+    restore            Recreate symlinks from skill destinations back to sources
 
   -h, --help           Show this help
 `;
@@ -182,12 +197,36 @@ function parseNewArgs(rest: string[]): ParsedNewCliArgs {
   return { command: "new", options };
 }
 
+function parseRefsArgs(rest: string[]): ParsedRefsCliArgs {
+  const [mode, ...extraArgs] = rest;
+
+  if (!mode) {
+    throw new Error("Missing mode for refs. Expected: materialize or restore");
+  }
+
+  if (extraArgs.length > 0) {
+    throw new Error(`Unexpected extra arguments: ${extraArgs.join(" ")}`);
+  }
+
+  if (mode !== "materialize" && mode !== "restore") {
+    throw new Error(`Unsupported refs mode: ${mode}`);
+  }
+
+  return {
+    command: "refs",
+    options: {
+      mode,
+    },
+  };
+}
+
 export function parseCliArgs(argv: string[]): ParsedCliArgs {
   const [command, ...rest] = argv;
   if (!command)
-    throw new Error("Missing command. Supported commands: extract, new");
+    throw new Error("Missing command. Supported commands: extract, new, refs");
   if (command === "extract") return parseExtractArgs(rest);
   if (command === "new") return parseNewArgs(rest);
+  if (command === "refs") return parseRefsArgs(rest);
   throw new Error(`Unsupported command: ${command}`);
 }
 
@@ -275,6 +314,17 @@ export async function runCli(
           report.deletedSkills,
           dependencies.isInteractive,
         ),
+      );
+      return 0;
+    }
+
+    if (parsed.command === "refs") {
+      const report = await syncSkillPublishRefs({
+        ...parsed.options,
+        logger: dependencies.logger,
+      });
+      dependencies.stdout.log(
+        `Synchronized ${report.synced.length} publish refs in ${report.mode} mode.`,
       );
       return 0;
     }

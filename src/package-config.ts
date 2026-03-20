@@ -6,10 +6,12 @@ import {
   NpmSkillsConsumeConfig,
   NpmSkillsConfig,
   NpmSkillsPublishConfig,
+  NpmSkillsPublishRefConfig,
   ProjectPackageJson,
   ResolvedNpmSkillsConsumeConfig,
   ResolvedNpmSkillsConfig,
   ResolvedNpmSkillsPublishConfig,
+  ResolvedNpmSkillsPublishRefConfig,
 } from "./types";
 
 export const DEFAULT_SKILLS_DIR = "skills";
@@ -91,6 +93,33 @@ function resolvePublishSource(
   return undefined;
 }
 
+function resolvePublishRefs(
+  config: NpmSkillsPublishConfig | undefined,
+): ResolvedNpmSkillsPublishRefConfig[] {
+  if (!Array.isArray(config?.refs)) return [];
+
+  return config.refs.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+
+    const ref = entry as NpmSkillsPublishRefConfig;
+    if (
+      typeof ref.source !== "string" ||
+      typeof ref.destination !== "string" ||
+      ref.source.length === 0 ||
+      ref.destination.length === 0
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        source: ref.source,
+        destination: ref.destination,
+      },
+    ];
+  });
+}
+
 function resolvePublishConfig(
   packageJson: ProjectPackageJson | InstalledPackageJson,
 ): ResolvedNpmSkillsPublishConfig {
@@ -111,6 +140,7 @@ function resolvePublishConfig(
     return {
       source: resolvePublishSource(publishConfig) ?? DEFAULT_SKILLS_DIR,
       exports: [],
+      refs: [],
       disabled: true,
     };
   }
@@ -118,6 +148,7 @@ function resolvePublishConfig(
   return {
     source: resolvePublishSource(publishConfig) ?? DEFAULT_SKILLS_DIR,
     exports: exportedNames ?? [],
+    refs: resolvePublishRefs(publishConfig),
     disabled: false,
   };
 }

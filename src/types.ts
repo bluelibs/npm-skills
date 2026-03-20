@@ -13,11 +13,17 @@ export interface NpmSkillsConsumeConfig {
 export interface NpmSkillsPublishConfig {
   source?: string;
   export?: false | string[];
+  refs?: NpmSkillsPublishRefConfig[];
 }
 
 export interface NpmSkillsConfig {
   consume?: NpmSkillsConsumeConfig;
   publish?: false | NpmSkillsPublishConfig;
+}
+
+export interface NpmSkillsPublishRefConfig {
+  source: string;
+  destination: string;
 }
 
 export interface ResolvedNpmSkillsConsumeConfig {
@@ -29,7 +35,13 @@ export interface ResolvedNpmSkillsConsumeConfig {
 export interface ResolvedNpmSkillsPublishConfig {
   source: string;
   exports: string[];
+  refs: ResolvedNpmSkillsPublishRefConfig[];
   disabled: boolean;
+}
+
+export interface ResolvedNpmSkillsPublishRefConfig {
+  source: string;
+  destination: string;
 }
 
 export interface ResolvedNpmSkillsConfig {
@@ -120,6 +132,22 @@ export interface CreateSkillTemplateReport {
   skillName: string;
   skillDir: string;
   skillFile: string;
+}
+
+export interface SyncRefsOptions {
+  cwd?: string;
+  mode: "materialize" | "restore";
+  logger?: Logger;
+}
+
+export interface SyncedPublishRef {
+  sourcePath: string;
+  destinationPath: string;
+}
+
+export interface SyncRefsReport {
+  mode: "materialize" | "restore";
+  synced: SyncedPublishRef[];
 }
 
 export interface CliDependencies {
