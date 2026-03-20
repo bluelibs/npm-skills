@@ -1,6 +1,6 @@
 {
   "name": "npm-skills",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Extract skills from installed npm packages into a local skills folder.",
   "license": "MIT",
   "homepage": "https://github.com/bluelibs/npm-skills#readme",
